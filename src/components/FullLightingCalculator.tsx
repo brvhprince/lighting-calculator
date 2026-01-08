@@ -178,12 +178,11 @@ export default function FullLightingCalculator() {
 
               <div className="space-y-2">
                 <Label htmlFor="fixtureSize">Fixture Size (optional)</Label>
-                <Select value={fixtureSize} onValueChange={setFixtureSize}>
+                <Select value={fixtureSize || undefined} onValueChange={setFixtureSize}>
                   <SelectTrigger id="fixtureSize">
                     <SelectValue placeholder="Auto-select based on room" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Auto-select</SelectItem>
                     {Object.entries(FIXTURE_SIZES).map(([key, fixture]) => (
                       <SelectItem key={key} value={key}>
                         {fixture.name} ({fixture.typicalLumens.recommended} lumens typical)
