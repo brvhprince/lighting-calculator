@@ -7,11 +7,16 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Calculator, Lightbulb, Ruler, Grid3x3 } from 'lucide-react';
+import { Calculator, Lightbulb, Ruler, Grid3x3, Save } from 'lucide-react';
 import { ROOM_TYPES } from '@/lib/roomTypes';
 import { FIXTURE_SIZES } from '@/lib/fixtureTypes';
 import { calculateLighting } from '@/lib/calculator';
 import { CalculationInput, CalculationResult, UnitSystem } from '@/types';
+import { SavedCalculations } from './SavedCalculations';
+import { SavedCalculation } from '@/types/saved-calculations';
+import { saveCalculation, generateCalculationId } from '@/lib/savedCalculations';
+import { ShoppingList } from './ShoppingList';
+import { PDFExport } from './PDFExport';
 
 export default function FullLightingCalculator() {
   const [unitSystem, setUnitSystem] = useState<UnitSystem>('imperial');
@@ -45,12 +50,58 @@ export default function FullLightingCalculator() {
     setResult(calculationResult);
   };
 
+  const handleSave = () => {
+    if (!result) return;
+
+    const input: CalculationInput = {
+      length: parseFloat(length),
+      width: parseFloat(width),
+      unitSystem,
+      roomType,
+      isExpert,
+      customLumensPerSqFt: customLumens ? parseFloat(customLumens) : undefined,
+      fixtureSize: fixtureSize || undefined,
+      customFixtureLumens: customFixtureLumens ? parseFloat(customFixtureLumens) : undefined,
+    };
+
+    const roomName = ROOM_TYPES[roomType]?.name || 'Room';
+    const savedCalc: SavedCalculation = {
+      id: generateCalculationId(),
+      name: `${roomName} - ${result.area.toFixed(0)} ${result.areaUnit}`,
+      timestamp: Date.now(),
+      type: 'full',
+      input,
+      result,
+    };
+
+    saveCalculation(savedCalc);
+    alert('Calculation saved successfully!');
+  };
+
+  const handleLoad = (calculation: SavedCalculation) => {
+    if (calculation.type !== 'full') return;
+
+    const input = calculation.input as CalculationInput;
+    setUnitSystem(input.unitSystem);
+    setLength(input.length.toString());
+    setWidth(input.width.toString());
+    setRoomType(input.roomType);
+    setIsExpert(input.isExpert);
+    setCustomLumens(input.customLumensPerSqFt?.toString() || '');
+    setFixtureSize(input.fixtureSize || '');
+    setCustomFixtureLumens(input.customFixtureLumens?.toString() || '');
+    setResult(calculation.result as CalculationResult);
+  };
+
   const getDimensionLabel = () => {
     return unitSystem === 'metric' ? 'millimeters (mm) or meters (m)' : 'inches or feet';
   };
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <SavedCalculations onLoad={handleLoad} />
+      </div>
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -219,7 +270,15 @@ export default function FullLightingCalculator() {
 
       {/* Results */}
       {result && (
-        <div className="grid gap-6 md:grid-cols-2">
+        <>
+          <div className="flex justify-end gap-3">
+            <PDFExport result={result} roomType={roomType} />
+            <Button onClick={handleSave} variant="default" className="gap-2">
+              <Save className="h-4 w-4" />
+              Save Calculation
+            </Button>
+          </div>
+          <div className="grid gap-6 md:grid-cols-2">
           {/* Main Results */}
           <Card>
             <CardHeader>
@@ -343,6 +402,10 @@ export default function FullLightingCalculator() {
             </CardContent>
           </Card>
         </div>
+
+          {/* Shopping List */}
+          <ShoppingList result={result} roomType={roomType} />
+        </>
       )}
     </div>
   );

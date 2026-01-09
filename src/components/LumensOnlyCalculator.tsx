@@ -7,10 +7,13 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Lightbulb, Zap } from 'lucide-react';
+import { Lightbulb, Zap, Save } from 'lucide-react';
 import { ROOM_TYPES } from '@/lib/roomTypes';
 import { calculateLumensOnly } from '@/lib/calculator';
 import { UnitSystem } from '@/types';
+import { SavedCalculations } from './SavedCalculations';
+import { SavedCalculation, LumensOnlyInput, LumensOnlyResult } from '@/types/saved-calculations';
+import { saveCalculation, generateCalculationId } from '@/lib/savedCalculations';
 
 export default function LumensOnlyCalculator() {
   const [unitSystem, setUnitSystem] = useState<UnitSystem>('imperial');
@@ -42,12 +45,52 @@ export default function LumensOnlyCalculator() {
     setResult(calculationResult);
   };
 
+  const handleSave = () => {
+    if (!result) return;
+
+    const input: LumensOnlyInput = {
+      length: parseFloat(length),
+      width: parseFloat(width),
+      roomType,
+      unitSystem,
+      customLumensPerSqFt: customLumens ? parseFloat(customLumens) : undefined,
+    };
+
+    const roomName = ROOM_TYPES[roomType]?.name || 'Room';
+    const savedCalc: SavedCalculation = {
+      id: generateCalculationId(),
+      name: `${roomName} Lumens - ${result.area.toFixed(0)} ${result.areaUnit}`,
+      timestamp: Date.now(),
+      type: 'lumens',
+      input,
+      result,
+    };
+
+    saveCalculation(savedCalc);
+    alert('Calculation saved successfully!');
+  };
+
+  const handleLoad = (calculation: SavedCalculation) => {
+    if (calculation.type !== 'lumens') return;
+
+    const input = calculation.input as LumensOnlyInput;
+    setUnitSystem(input.unitSystem);
+    setLength(input.length.toString());
+    setWidth(input.width.toString());
+    setRoomType(input.roomType);
+    setCustomLumens(input.customLumensPerSqFt?.toString() || '');
+    setResult(calculation.result as LumensOnlyResult);
+  };
+
   const getDimensionLabel = () => {
     return unitSystem === 'metric' ? 'millimeters (mm) or meters (m)' : 'inches or feet';
   };
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <SavedCalculations onLoad={handleLoad} />
+      </div>
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -158,7 +201,14 @@ export default function LumensOnlyCalculator() {
 
       {/* Results */}
       {result && (
-        <Card>
+        <>
+          <div className="flex justify-end">
+            <Button onClick={handleSave} variant="default" className="gap-2">
+              <Save className="h-4 w-4" />
+              Save Calculation
+            </Button>
+          </div>
+          <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Lightbulb className="h-5 w-5" />
@@ -223,6 +273,7 @@ export default function LumensOnlyCalculator() {
             </div>
           </CardContent>
         </Card>
+        </>
       )}
     </div>
   );

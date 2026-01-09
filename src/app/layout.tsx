@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Link from "next/link";
 import { Lightbulb } from "lucide-react";
+import { ThemeProvider } from "@/components/ThemeProvider";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export const metadata: Metadata = {
   title: "Pen Lighting Calculator - Professional Lighting Design by Pen Homes",
@@ -14,10 +16,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className="font-sans antialiased">
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50">
-          <nav className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
+        <ThemeProvider>
+          <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+          <nav className="border-b bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm sticky top-0 z-50">
             <div className="container mx-auto px-4 py-4">
               <div className="flex items-center justify-between">
                 <Link href="/" className="flex items-center gap-2 text-xl font-bold">
@@ -29,7 +32,7 @@ export default function RootLayout({
                     <div className="text-xs text-muted-foreground font-normal">by Pen Homes</div>
                   </div>
                 </Link>
-                <div className="flex gap-4">
+                <div className="flex items-center gap-4">
                   <Link
                     href="/calculator"
                     className="text-sm font-medium hover:text-primary transition-colors"
@@ -42,6 +45,7 @@ export default function RootLayout({
                   >
                     Lumens Only
                   </Link>
+                  <ThemeToggle />
                 </div>
               </div>
             </div>
@@ -49,12 +53,13 @@ export default function RootLayout({
           <main className="container mx-auto px-4 py-8">
             {children}
           </main>
-          <footer className="border-t bg-white/80 backdrop-blur-sm mt-16">
+          <footer className="border-t bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm mt-16">
             <div className="container mx-auto px-4 py-6 text-center text-sm text-muted-foreground">
               <p>© {new Date().getFullYear()} Pen Lighting by Pen Homes. Professional lighting calculator.</p>
             </div>
           </footer>
         </div>
+        </ThemeProvider>
       </body>
     </html>
   );

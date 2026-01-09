@@ -57,3 +57,30 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Print styles for shopping list */
+@media print {
+  body {
+    @apply bg-white text-black;
+  }
+
+  nav, footer, button {
+    display: none !important;
+  }
+
+  .print\:hidden {
+    display: none !important;
+  }
+
+  .print\:shadow-none {
+    box-shadow: none !important;
+  }
+
+  .print\:block {
+    display: block !important;
+  }
+
+  @page {
+    margin: 1cm;
+  }
+}
