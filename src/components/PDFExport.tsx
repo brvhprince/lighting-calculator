@@ -8,11 +8,12 @@ import { ROOM_TYPES } from '@/lib/roomTypes';
 type PDFExportProps = {
   result: CalculationResult;
   roomType: string;
+  customRoomName?: string;
 };
 
-export function PDFExport({ result, roomType }: PDFExportProps) {
+export function PDFExport({ result, roomType, customRoomName }: PDFExportProps) {
   const handleExport = () => {
-    const roomName = ROOM_TYPES[roomType]?.name || 'Room';
+    const roomName = customRoomName || ROOM_TYPES[roomType]?.name || 'Room';
     const date = new Date().toLocaleDateString();
 
     // Create text content for the PDF

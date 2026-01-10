@@ -23,6 +23,8 @@ export default function FullLightingCalculator() {
   const [length, setLength] = useState<string>('');
   const [width, setWidth] = useState<string>('');
   const [roomType, setRoomType] = useState<string>('');
+  const [customRoomName, setCustomRoomName] = useState<string>('');
+  const [customRoomLumens, setCustomRoomLumens] = useState<string>('');
   const [isExpert, setIsExpert] = useState(false);
   const [customLumens, setCustomLumens] = useState<string>('');
   const [fixtureSize, setFixtureSize] = useState<string>('');
@@ -35,13 +37,24 @@ export default function FullLightingCalculator() {
       return;
     }
 
+    if (roomType === 'other') {
+      if (!customRoomName || !customRoomLumens) {
+        alert('Please enter a room name and lumens per square foot for custom room type');
+        return;
+      }
+    }
+
     const input: CalculationInput = {
       length: parseFloat(length),
       width: parseFloat(width),
       unitSystem,
       roomType,
       isExpert,
-      customLumensPerSqFt: customLumens ? parseFloat(customLumens) : undefined,
+      customLumensPerSqFt: roomType === 'other' && customRoomLumens
+        ? parseFloat(customRoomLumens)
+        : customLumens
+        ? parseFloat(customLumens)
+        : undefined,
       fixtureSize: fixtureSize || undefined,
       customFixtureLumens: customFixtureLumens ? parseFloat(customFixtureLumens) : undefined,
     };
@@ -59,12 +72,18 @@ export default function FullLightingCalculator() {
       unitSystem,
       roomType,
       isExpert,
-      customLumensPerSqFt: customLumens ? parseFloat(customLumens) : undefined,
+      customLumensPerSqFt: roomType === 'other' && customRoomLumens
+        ? parseFloat(customRoomLumens)
+        : customLumens
+        ? parseFloat(customLumens)
+        : undefined,
       fixtureSize: fixtureSize || undefined,
       customFixtureLumens: customFixtureLumens ? parseFloat(customFixtureLumens) : undefined,
     };
 
-    const roomName = ROOM_TYPES[roomType]?.name || 'Room';
+    const roomName = roomType === 'other' && customRoomName
+      ? customRoomName
+      : ROOM_TYPES[roomType]?.name || 'Room';
     const savedCalc: SavedCalculation = {
       id: generateCalculationId(),
       name: `${roomName} - ${result.area.toFixed(0)} ${result.areaUnit}`,
@@ -177,14 +196,45 @@ export default function FullLightingCalculator() {
                     {room.name} ({room.lumensPerSqFt.recommended} lumens/ft²)
                   </SelectItem>
                 ))}
+                <SelectItem value="other">Other (Custom)</SelectItem>
               </SelectContent>
             </Select>
-            {roomType && (
+            {roomType && roomType !== 'other' && (
               <p className="text-sm text-muted-foreground">
                 {ROOM_TYPES[roomType]?.description}
               </p>
             )}
           </div>
+
+          {/* Custom Room Type Fields */}
+          {roomType === 'other' && (
+            <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
+              <h4 className="font-semibold text-sm">Custom Room Type</h4>
+              <div className="space-y-2">
+                <Label htmlFor="customRoomName">Room Name</Label>
+                <Input
+                  id="customRoomName"
+                  type="text"
+                  placeholder="e.g., Sunroom, Workshop, Studio"
+                  value={customRoomName}
+                  onChange={(e) => setCustomRoomName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="customRoomLumens">Lumens per Square Foot</Label>
+                <Input
+                  id="customRoomLumens"
+                  type="number"
+                  placeholder="e.g., 30"
+                  value={customRoomLumens}
+                  onChange={(e) => setCustomRoomLumens(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Typical range: 10-80 lumens/ft² depending on room purpose
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Expert Mode Toggle */}
           <div className="space-y-3">
@@ -272,7 +322,11 @@ export default function FullLightingCalculator() {
       {result && (
         <>
           <div className="flex justify-end gap-3">
-            <PDFExport result={result} roomType={roomType} />
+            <PDFExport
+              result={result}
+              roomType={roomType}
+              customRoomName={roomType === 'other' ? customRoomName : undefined}
+            />
             <Button onClick={handleSave} variant="default" className="gap-2">
               <Save className="h-4 w-4" />
               Save Calculation
@@ -404,7 +458,11 @@ export default function FullLightingCalculator() {
         </div>
 
           {/* Shopping List */}
-          <ShoppingList result={result} roomType={roomType} />
+          <ShoppingList
+            result={result}
+            roomType={roomType}
+            customRoomName={roomType === 'other' ? customRoomName : undefined}
+          />
         </>
       )}
     </div>
