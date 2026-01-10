@@ -20,6 +20,8 @@ export default function LumensOnlyCalculator() {
   const [length, setLength] = useState<string>('');
   const [width, setWidth] = useState<string>('');
   const [roomType, setRoomType] = useState<string>('');
+  const [customRoomName, setCustomRoomName] = useState<string>('');
+  const [customRoomLumens, setCustomRoomLumens] = useState<string>('');
   const [customLumens, setCustomLumens] = useState<string>('');
   const [result, setResult] = useState<{
     totalLumens: number;
@@ -34,12 +36,25 @@ export default function LumensOnlyCalculator() {
       return;
     }
 
+    if (roomType === 'other') {
+      if (!customRoomName || !customRoomLumens) {
+        alert('Please enter a room name and lumens per square foot for custom room type');
+        return;
+      }
+    }
+
+    const lumensPerSqFt = roomType === 'other' && customRoomLumens
+      ? parseFloat(customRoomLumens)
+      : customLumens
+      ? parseFloat(customLumens)
+      : undefined;
+
     const calculationResult = calculateLumensOnly(
       parseFloat(length),
       parseFloat(width),
       roomType,
       unitSystem,
-      customLumens ? parseFloat(customLumens) : undefined
+      lumensPerSqFt
     );
 
     setResult(calculationResult);
@@ -53,10 +68,16 @@ export default function LumensOnlyCalculator() {
       width: parseFloat(width),
       roomType,
       unitSystem,
-      customLumensPerSqFt: customLumens ? parseFloat(customLumens) : undefined,
+      customLumensPerSqFt: roomType === 'other' && customRoomLumens
+        ? parseFloat(customRoomLumens)
+        : customLumens
+        ? parseFloat(customLumens)
+        : undefined,
     };
 
-    const roomName = ROOM_TYPES[roomType]?.name || 'Room';
+    const roomName = roomType === 'other' && customRoomName
+      ? customRoomName
+      : ROOM_TYPES[roomType]?.name || 'Room';
     const savedCalc: SavedCalculation = {
       id: generateCalculationId(),
       name: `${roomName} Lumens - ${result.area.toFixed(0)} ${result.areaUnit}`,
@@ -166,14 +187,45 @@ export default function LumensOnlyCalculator() {
                     {room.name} ({room.lumensPerSqFt.recommended} lumens/ft²)
                   </SelectItem>
                 ))}
+                <SelectItem value="other">Other (Custom)</SelectItem>
               </SelectContent>
             </Select>
-            {roomType && (
+            {roomType && roomType !== 'other' && (
               <p className="text-sm text-muted-foreground">
                 {ROOM_TYPES[roomType]?.description}
               </p>
             )}
           </div>
+
+          {/* Custom Room Type Fields */}
+          {roomType === 'other' && (
+            <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
+              <h4 className="font-semibold text-sm">Custom Room Type</h4>
+              <div className="space-y-2">
+                <Label htmlFor="customRoomName-lumens">Room Name</Label>
+                <Input
+                  id="customRoomName-lumens"
+                  type="text"
+                  placeholder="e.g., Sunroom, Workshop, Studio"
+                  value={customRoomName}
+                  onChange={(e) => setCustomRoomName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="customRoomLumens-lumens">Lumens per Square Foot</Label>
+                <Input
+                  id="customRoomLumens-lumens"
+                  type="number"
+                  placeholder="e.g., 30"
+                  value={customRoomLumens}
+                  onChange={(e) => setCustomRoomLumens(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Typical range: 10-80 lumens/ft² depending on room purpose
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Custom Lumens (Optional) */}
           <div className="space-y-2">
@@ -258,8 +310,12 @@ export default function LumensOnlyCalculator() {
                 <li className="flex gap-2">
                   <span className="text-primary">•</span>
                   <span>
-                    This calculation is based on {result.lumensPerSqFt} lumens per square foot,
-                    which is appropriate for a {ROOM_TYPES[roomType]?.name.toLowerCase()}.
+                    This calculation is based on {result.lumensPerSqFt} lumens per square foot
+                    {roomType === 'other' && customRoomName
+                      ? `, which you specified for your ${customRoomName.toLowerCase()}.`
+                      : roomType !== 'other'
+                      ? `, which is appropriate for a ${ROOM_TYPES[roomType]?.name.toLowerCase()}.`
+                      : '.'}
                   </span>
                 </li>
                 <li className="flex gap-2">

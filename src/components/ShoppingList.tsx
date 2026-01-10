@@ -9,10 +9,11 @@ import { ROOM_TYPES } from '@/lib/roomTypes';
 type ShoppingListProps = {
   result: CalculationResult;
   roomType: string;
+  customRoomName?: string;
 };
 
-export function ShoppingList({ result, roomType }: ShoppingListProps) {
-  const roomName = ROOM_TYPES[roomType]?.name || 'Room';
+export function ShoppingList({ result, roomType, customRoomName }: ShoppingListProps) {
+  const roomName = customRoomName || ROOM_TYPES[roomType]?.name || 'Room';
 
   const handlePrint = () => {
     window.print();
