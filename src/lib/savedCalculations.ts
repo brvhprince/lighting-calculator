@@ -43,5 +43,5 @@ export function clearAllCalculations(): void {
 }
 
 export function generateCalculationId(): string {
-  return `calc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  return `calc-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 }
