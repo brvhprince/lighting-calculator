@@ -29,6 +29,7 @@ export default function LumensOnlyCalculator() {
     area: number;
     areaUnit: string;
   } | null>(null);
+  const [description, setDescription] = useState<string>('');
 
   const handleCalculate = () => {
     if (!length || !width || !roomType) {
@@ -81,6 +82,7 @@ export default function LumensOnlyCalculator() {
     const savedCalc: SavedCalculation = {
       id: generateCalculationId(),
       name: `${roomName} Lumens - ${result.area.toFixed(0)} ${result.areaUnit}`,
+      description: description.trim() || undefined,
       timestamp: Date.now(),
       type: 'lumens',
       input,
@@ -254,7 +256,19 @@ export default function LumensOnlyCalculator() {
       {/* Results */}
       {result && (
         <>
-          <div className="flex justify-end">
+          <div className="flex items-end justify-end gap-3">
+            <div className="flex-1 max-w-md space-y-1">
+              <Label htmlFor="description-lumens" className="text-sm">
+                Description (optional)
+              </Label>
+              <Input
+                id="description-lumens"
+                type="text"
+                placeholder="e.g., Master bedroom closet, Guest room"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </div>
             <Button onClick={handleSave} variant="default" className="gap-2">
               <Save className="h-4 w-4" />
               Save Calculation

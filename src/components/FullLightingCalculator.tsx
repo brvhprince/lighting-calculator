@@ -30,6 +30,7 @@ export default function FullLightingCalculator() {
   const [fixtureSize, setFixtureSize] = useState<string>('');
   const [customFixtureLumens, setCustomFixtureLumens] = useState<string>('');
   const [result, setResult] = useState<CalculationResult | null>(null);
+  const [description, setDescription] = useState<string>('');
 
   const handleCalculate = () => {
     if (!length || !width || !roomType) {
@@ -87,6 +88,7 @@ export default function FullLightingCalculator() {
     const savedCalc: SavedCalculation = {
       id: generateCalculationId(),
       name: `${roomName} - ${result.area.toFixed(0)} ${result.areaUnit}`,
+      description: description.trim() || undefined,
       timestamp: Date.now(),
       type: 'full',
       input,
@@ -321,7 +323,19 @@ export default function FullLightingCalculator() {
       {/* Results */}
       {result && (
         <>
-          <div className="flex justify-end gap-3">
+          <div className="flex items-end justify-end gap-3">
+            <div className="flex-1 max-w-md space-y-1">
+              <Label htmlFor="description-full" className="text-sm">
+                Description (optional)
+              </Label>
+              <Input
+                id="description-full"
+                type="text"
+                placeholder="e.g., Master bedroom closet, Guest room"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </div>
             <PDFExport
               result={result}
               roomType={roomType}

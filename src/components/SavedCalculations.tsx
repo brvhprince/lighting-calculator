@@ -100,6 +100,9 @@ export function SavedCalculations({ onLoad }: SavedCalculationsProps) {
                       )}
                       <div>
                         <CardTitle className="text-base">{calc.name}</CardTitle>
+                        {calc.description && (
+                          <p className="text-sm text-muted-foreground mt-0.5">{calc.description}</p>
+                        )}
                         <CardDescription className="flex items-center gap-2 mt-1">
                           <Clock className="h-3 w-3" />
                           {formatDate(calc.timestamp)}

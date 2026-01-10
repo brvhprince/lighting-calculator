@@ -3,6 +3,7 @@ import { CalculationInput, CalculationResult } from './index';
 export type SavedCalculation = {
   id: string;
   name: string;
+  description?: string;
   timestamp: number;
   type: 'full' | 'lumens';
   input: CalculationInput | LumensOnlyInput;
