@@ -75,6 +75,7 @@ export default function RoomDesigner() {
   const [showHeatmap, setShowHeatmap] = useState(true);
   const [scaleRatio, setScaleRatio] = useState<'fit' | '20' | '50' | '100'>('fit');
   const [showDims, setShowDims] = useState(false);
+  const [ortho, setOrtho] = useState(false);
   // Edge (wall) editing
   const [selectedEdge, setSelectedEdge] = useState<number | null>(null);
   const [edgeLen, setEdgeLen] = useState('');
@@ -301,22 +302,6 @@ export default function RoomDesigner() {
       ctx.stroke();
     }
 
-    // Edge length labels
-    if (points.length >= 2) {
-      ctx.fillStyle = isDark ? 'rgba(245,242,237,0.75)' : 'rgba(44,51,46,0.75)';
-      ctx.font = '11px sans-serif';
-      ctx.textAlign = 'center';
-      const n = closed ? points.length : points.length - 1;
-      for (let i = 0; i < n; i++) {
-        const a = points[i];
-        const b = points[(i + 1) % points.length];
-        const lenFt = Math.hypot(b.x - a.x, b.y - a.y);
-        if (lenFt < 0.1) continue;
-        const mid = toScreen({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
-        ctx.fillText(`${toDisplayLen(lenFt).toFixed(1)} ${unitLabel}`, mid.x, mid.y - 4);
-      }
-    }
-
     // Fixtures + heatmap
     if (result && result.fixtures.length) {
       if (showHeatmap) {
@@ -358,6 +343,61 @@ export default function RoomDesigner() {
       ctx.fill();
       ctx.stroke();
     }
+
+    // Labels on top (so the heatmap can't wash them out), each on a contrast pill.
+    const labelBg = isDark ? 'rgba(18,22,19,0.9)' : 'rgba(245,242,237,0.95)';
+    const labelFg = isDark ? '#F5F2ED' : '#2C332E';
+    const cornerBg = `hsl(${styles.getPropertyValue('--brand-bronze').trim()})`;
+
+    const pill = (text: string, x: number, y: number, fg: string, bg: string) => {
+      ctx.font = '11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const w = ctx.measureText(text).width + 10;
+      const h = 16;
+      const rx = x - w / 2;
+      const ry = y - h / 2;
+      const r = 5;
+      ctx.beginPath();
+      ctx.moveTo(rx + r, ry);
+      ctx.arcTo(rx + w, ry, rx + w, ry + h, r);
+      ctx.arcTo(rx + w, ry + h, rx, ry + h, r);
+      ctx.arcTo(rx, ry + h, rx, ry, r);
+      ctx.arcTo(rx, ry, rx + w, ry, r);
+      ctx.closePath();
+      ctx.fillStyle = bg;
+      ctx.fill();
+      ctx.fillStyle = fg;
+      ctx.fillText(text, x, y);
+    };
+
+    // Edge length labels
+    if (points.length >= 2) {
+      const segs = closed ? points.length : points.length - 1;
+      for (let i = 0; i < segs; i++) {
+        const a = points[i];
+        const b = points[(i + 1) % points.length];
+        const lenFt = Math.hypot(b.x - a.x, b.y - a.y);
+        if (lenFt < 0.1) continue;
+        const mid = toScreen({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+        pill(`${toDisplayLen(lenFt).toFixed(1)} ${unitLabel}`, mid.x, mid.y, labelFg, labelBg);
+      }
+    }
+
+    // Corner numbers, nudged outward from the shape's centre.
+    if (points.length >= 1) {
+      const cx = screenPts.reduce((s, p) => s + p.x, 0) / screenPts.length;
+      const cy = screenPts.reduce((s, p) => s + p.y, 0) / screenPts.length;
+      for (let i = 0; i < screenPts.length; i++) {
+        const s = screenPts[i];
+        const dx = s.x - cx;
+        const dy = s.y - cy;
+        const d = Math.hypot(dx, dy) || 1;
+        pill(String(i + 1), s.x + (dx / d) * 16, s.y + (dy / d) * 16, '#ffffff', cornerBg);
+      }
+    }
+
+    ctx.textBaseline = 'alphabetic';
   }, [points, closed, cursor, view, toScreen, result, showHeatmap, toDisplayLen, unitLabel, selectedEdge]);
 
   useEffect(() => {
@@ -393,7 +433,10 @@ export default function RoomDesigner() {
           return;
         }
       }
-      setPoints((prev) => [...prev, toFeet(sx, sy)]);
+      const raw = toFeet(sx, sy);
+      const last = points[points.length - 1];
+      const np = ortho && last ? orthoSnap(last, raw) : raw;
+      setPoints((prev) => [...prev, np]);
       return;
     }
     const hit = hitVertex(sx, sy);
@@ -433,10 +476,31 @@ export default function RoomDesigner() {
   const onPointerMove = (e: React.PointerEvent) => {
     const { sx, sy } = getLocal(e);
     if (dragIndex.current !== null) {
-      const p = toFeet(sx, sy);
-      setPoints((prev) => prev.map((pt, i) => (i === dragIndex.current ? p : pt)));
+      const v = toFeet(sx, sy);
+      const i = dragIndex.current;
+      const n = points.length;
+      if (ortho && closed && n >= 3) {
+        // Keep adjacent walls axis-aligned: drag the vertex freely and slide each
+        // neighbour along the shared axis so its wall stays horizontal/vertical.
+        const prevIdx = (i - 1 + n) % n;
+        const nextIdx = (i + 1) % n;
+        const prevOri = orientation(points[prevIdx], points[i]);
+        const nextOri = orientation(points[i], points[nextIdx]);
+        setPoints((prev) =>
+          prev.map((pt, idx) => {
+            if (idx === i) return v;
+            if (idx === prevIdx) return prevOri === 'h' ? { ...pt, y: v.y } : { ...pt, x: v.x };
+            if (idx === nextIdx) return nextOri === 'h' ? { ...pt, y: v.y } : { ...pt, x: v.x };
+            return pt;
+          })
+        );
+      } else {
+        setPoints((prev) => prev.map((pt, idx) => (idx === i ? v : pt)));
+      }
     } else if (!closed && mode === 'free' && points.length > 0) {
-      setCursor(toFeet(sx, sy));
+      const raw = toFeet(sx, sy);
+      const last = points[points.length - 1];
+      setCursor(ortho ? orthoSnap(last, raw) : raw);
     }
   };
 
@@ -469,19 +533,55 @@ export default function RoomDesigner() {
     const newLen = fromDimLen(parseFloat(edgeLen) || 0);
     if (newLen <= 0) return;
 
+    // In ortho mode, force the wall onto its dominant axis so the length change
+    // stays purely horizontal/vertical.
+    let ux = dx;
+    let uy = dy;
+    if (ortho) {
+      if (orientation(A, B) === 'h') {
+        ux = Math.sign(dx) || 1;
+        uy = 0;
+      } else {
+        ux = 0;
+        uy = Math.sign(dy) || 1;
+      }
+    }
+
     let A2 = A;
     let B2 = B;
     if (mode === 'end') {
-      B2 = { x: A.x + dx * newLen, y: A.y + dy * newLen };
+      B2 = { x: A.x + ux * newLen, y: A.y + uy * newLen };
     } else if (mode === 'start') {
-      A2 = { x: B.x - dx * newLen, y: B.y - dy * newLen };
+      A2 = { x: B.x - ux * newLen, y: B.y - uy * newLen };
     } else {
       const mx = (A.x + B.x) / 2;
       const my = (A.y + B.y) / 2;
-      A2 = { x: mx - (dx * newLen) / 2, y: my - (dy * newLen) / 2 };
-      B2 = { x: mx + (dx * newLen) / 2, y: my + (dy * newLen) / 2 };
+      A2 = { x: mx - (ux * newLen) / 2, y: my - (uy * newLen) / 2 };
+      B2 = { x: mx + (ux * newLen) / 2, y: my + (uy * newLen) / 2 };
     }
-    setPoints((prev) => prev.map((p, idx) => (idx === i ? A2 : idx === bIdx ? B2 : p)));
+
+    // Pull the perpendicular neighbour walls along so corners stay square.
+    const zIdx = (i - 1 + n) % n;
+    const cIdx = (bIdx + 1) % n;
+    const movedA = A2 !== A;
+    const movedB = B2 !== B;
+    const orthoNeighbours = ortho && n >= 4;
+    const zOri = orientation(points[zIdx], A);
+    const cOri = orientation(B, points[cIdx]);
+
+    setPoints((prev) =>
+      prev.map((p, idx) => {
+        if (idx === i) return A2;
+        if (idx === bIdx) return B2;
+        if (orthoNeighbours && idx === zIdx && movedA && zIdx !== bIdx) {
+          return zOri === 'h' ? { ...p, y: A2.y } : { ...p, x: A2.x };
+        }
+        if (orthoNeighbours && idx === cIdx && movedB && cIdx !== i) {
+          return cOri === 'h' ? { ...p, y: B2.y } : { ...p, x: B2.x };
+        }
+        return p;
+      })
+    );
     setSelectedEdge(null);
   };
 
@@ -532,6 +632,14 @@ export default function RoomDesigner() {
               <Button variant="ghost" size="sm" onClick={() => setShowHeatmap((v) => !v)} className="gap-1.5">
                 <Flame className={`h-4 w-4 ${showHeatmap ? 'text-brand-bronze' : ''}`} />
                 Heatmap
+              </Button>
+              <Button
+                variant={ortho ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setOrtho((v) => !v)}
+                title="Constrain corners to right angles"
+              >
+                90°
               </Button>
               <Select value={scaleRatio} onValueChange={(v) => applyScale(v as typeof scaleRatio)}>
                 <SelectTrigger className="h-9 w-[120px]">
@@ -693,8 +801,8 @@ export default function RoomDesigner() {
                 <div className="space-y-2 rounded-lg border border-border p-3">
                   <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <Ruler className="h-3.5 w-3.5" />
-                    Exact corner coordinates in {unitLabel}. X is horizontal, Y is vertical; edge lengths
-                    on the plan update live.
+                    Exact corner coordinates in {unitLabel} — corners are numbered on the plan. X is
+                    horizontal, Y is vertical; edge lengths update live.
                   </p>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     {points.map((p, i) => (
@@ -883,6 +991,18 @@ function Metric({ label, children }: { label: string; children: React.ReactNode 
 
 function snap(v: number): number {
   return Math.round(v / SNAP_FT) * SNAP_FT;
+}
+
+// Edge orientation: 'h' (horizontal) when it runs more left-right than up-down.
+function orientation(a: Point, b: Point): 'h' | 'v' {
+  return Math.abs(b.x - a.x) >= Math.abs(b.y - a.y) ? 'h' : 'v';
+}
+
+// Snap a point so the segment from `prev` is purely horizontal or vertical.
+function orthoSnap(prev: Point, raw: Point): Point {
+  return Math.abs(raw.x - prev.x) >= Math.abs(raw.y - prev.y)
+    ? { x: raw.x, y: prev.y }
+    : { x: prev.x, y: raw.y };
 }
 
 // Distance from point P to segment A–B, in the same (screen) coordinate space.
