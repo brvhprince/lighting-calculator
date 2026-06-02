@@ -38,6 +38,7 @@ import {
   ArrowLeftToLine,
   ArrowRightToLine,
   MoveHorizontal,
+  Grid2x2,
   X,
 } from 'lucide-react';
 
@@ -585,6 +586,31 @@ export default function RoomDesigner() {
     setSelectedEdge(null);
   };
 
+  // Snap a near-rectilinear shape so every wall becomes exactly horizontal or
+  // vertical (all corners 90°). Walks the loop, aligning each wall's end corner
+  // to its start, then tidies the closing wall and snaps to the grid.
+  const squareUp = () => {
+    const n = points.length;
+    if (n < 3) return;
+    const pts = points.map((p) => ({ ...p }));
+    for (let i = 0; i < n - 1; i++) {
+      if (orientation(pts[i], pts[i + 1]) === 'h') pts[i + 1].y = pts[i].y;
+      else pts[i + 1].x = pts[i].x;
+    }
+    const lastOri = orientation(pts[n - 2], pts[n - 1]);
+    const closeOri = orientation(pts[n - 1], pts[0]);
+    if (closeOri !== lastOri) {
+      if (closeOri === 'h') pts[n - 1].y = pts[0].y;
+      else pts[n - 1].x = pts[0].x;
+    }
+    for (const p of pts) {
+      p.x = snap(p.x);
+      p.y = snap(p.y);
+    }
+    setPoints(pts);
+    setSelectedEdge(null);
+  };
+
   const undoPoint = () => {
     if (mode === 'free' && !closed) setPoints((prev) => prev.slice(0, -1));
   };
@@ -619,52 +645,66 @@ export default function RoomDesigner() {
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
       {/* Canvas */}
       <Card className="overflow-hidden">
-        <CardHeader className="pb-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Pentagon className="h-5 w-5 text-brand-bronze" />
-                Room Designer
-              </CardTitle>
-              <CardDescription>Draw any shape to scale — grid squares are 1 {unitLabel}.</CardDescription>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button variant="ghost" size="sm" onClick={() => setShowHeatmap((v) => !v)} className="gap-1.5">
-                <Flame className={`h-4 w-4 ${showHeatmap ? 'text-brand-bronze' : ''}`} />
-                Heatmap
-              </Button>
-              <Button
-                variant={ortho ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setOrtho((v) => !v)}
-                title="Constrain corners to right angles"
-              >
-                90°
-              </Button>
-              <Select value={scaleRatio} onValueChange={(v) => applyScale(v as typeof scaleRatio)}>
-                <SelectTrigger className="h-9 w-[120px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="fit">Auto-fit</SelectItem>
-                  <SelectItem value="20">Scale 1:20</SelectItem>
-                  <SelectItem value="50">Scale 1:50</SelectItem>
-                  <SelectItem value="100">Scale 1:100</SelectItem>
-                </SelectContent>
-              </Select>
-              <span className="rounded-md border border-border px-2 py-1 text-xs tabular-nums text-muted-foreground">
-                1:{currentRatio}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => applyScale('fit')}
-                className="gap-1.5"
-                title="Reset zoom so the whole plan fits the canvas"
-              >
-                <Maximize2 className="h-4 w-4" /> Fit
-              </Button>
-            </div>
+        <CardHeader className="space-y-3 pb-3">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Pentagon className="h-5 w-5 text-brand-bronze" />
+              Room Designer
+            </CardTitle>
+            <CardDescription>Draw any shape to scale — grid squares are 1 {unitLabel}.</CardDescription>
+          </div>
+          <div className="flex w-full flex-wrap items-stretch gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowHeatmap((v) => !v)}
+              className="flex-1 gap-1.5 border border-border"
+            >
+              <Flame className={`h-4 w-4 ${showHeatmap ? 'text-brand-bronze' : ''}`} />
+              Heatmap
+            </Button>
+            <Button
+              variant={ortho ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setOrtho((v) => !v)}
+              className={`flex-1 ${ortho ? '' : 'border border-border'}`}
+              title="Constrain corners to right angles"
+            >
+              90°
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={squareUp}
+              disabled={!closed || points.length < 3}
+              className="flex-1 gap-1.5 border border-border"
+              title="Snap all corners to exact right angles"
+            >
+              <Grid2x2 className="h-4 w-4" /> Square up
+            </Button>
+            <Select value={scaleRatio} onValueChange={(v) => applyScale(v as typeof scaleRatio)}>
+              <SelectTrigger className="h-9 flex-1 min-w-[110px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="fit">Auto-fit</SelectItem>
+                <SelectItem value="20">Scale 1:20</SelectItem>
+                <SelectItem value="50">Scale 1:50</SelectItem>
+                <SelectItem value="100">Scale 1:100</SelectItem>
+              </SelectContent>
+            </Select>
+            <span className="flex items-center justify-center rounded-md border border-border px-2 text-xs tabular-nums text-muted-foreground">
+              1:{currentRatio}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => applyScale('fit')}
+              className="flex-1 gap-1.5 border border-border"
+              title="Reset zoom so the whole plan fits the canvas"
+            >
+              <Maximize2 className="h-4 w-4" /> Fit
+            </Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
