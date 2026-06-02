@@ -194,7 +194,7 @@ export function ShoppingList({ result, roomType, customRoomName }: ShoppingListP
         </div>
 
         {/* Installation Notes */}
-        <div className="bg-blue-50 dark:bg-blue-950/30 p-4 rounded-lg space-y-2">
+        <div className="bg-accent/60 border border-border p-4 rounded-lg space-y-2">
           <h3 className="font-semibold text-sm">Installation Notes</h3>
           <ul className="text-sm space-y-1 list-disc ml-4">
             <li>

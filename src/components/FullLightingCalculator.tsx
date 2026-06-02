@@ -1,27 +1,36 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Calculator, Lightbulb, Ruler, Grid3x3, Save } from 'lucide-react';
+import { Calculator, Lightbulb, Ruler, Grid3x3, Save, ArrowUpDown, Wand2, Share2, Check } from 'lucide-react';
 import { ROOM_TYPES } from '@/lib/roomTypes';
 import { FIXTURE_SIZES } from '@/lib/fixtureTypes';
+import { ROOM_PRESETS, presetDimensions, RoomPreset } from '@/lib/roomPresets';
 import { calculateLighting } from '@/lib/calculator';
-import { CalculationInput, CalculationResult, UnitSystem } from '@/types';
+import { CalculationInput, CalculationResult, UnitSystem, NaturalLightLevel } from '@/types';
 import { SavedCalculations } from './SavedCalculations';
 import { SavedCalculation } from '@/types/saved-calculations';
 import { saveCalculation, generateCalculationId } from '@/lib/savedCalculations';
 import { ShoppingList } from './ShoppingList';
 import { PDFExport } from './PDFExport';
+import { buildShareUrl, decodeInput } from '@/lib/shareUrl';
+import { CostEnergyEstimator } from './CostEnergyEstimator';
+import { LightingZones } from './LightingZones';
+import { ProductRecommendations } from './ProductRecommendations';
 
 export default function FullLightingCalculator() {
   const [unitSystem, setUnitSystem] = useState<UnitSystem>('imperial');
   const [length, setLength] = useState<string>('');
   const [width, setWidth] = useState<string>('');
+  const [ceilingHeight, setCeilingHeight] = useState<string>('');
+  const [slopedCeiling, setSlopedCeiling] = useState(false);
+  const [ceilingPeakHeight, setCeilingPeakHeight] = useState<string>('');
+  const [naturalLight, setNaturalLight] = useState<NaturalLightLevel>('none');
   const [roomType, setRoomType] = useState<string>('');
   const [customRoomName, setCustomRoomName] = useState<string>('');
   const [customRoomLumens, setCustomRoomLumens] = useState<string>('');
@@ -31,6 +40,66 @@ export default function FullLightingCalculator() {
   const [customFixtureLumens, setCustomFixtureLumens] = useState<string>('');
   const [result, setResult] = useState<CalculationResult | null>(null);
   const [description, setDescription] = useState<string>('');
+  const [shareCopied, setShareCopied] = useState(false);
+
+  const buildInput = useCallback((): CalculationInput => ({
+    length: parseFloat(length),
+    width: parseFloat(width),
+    unitSystem,
+    roomType,
+    isExpert,
+    ceilingHeight: ceilingHeight ? parseFloat(ceilingHeight) : undefined,
+    slopedCeiling: slopedCeiling || undefined,
+    ceilingPeakHeight: slopedCeiling && ceilingPeakHeight ? parseFloat(ceilingPeakHeight) : undefined,
+    naturalLight: naturalLight !== 'none' ? naturalLight : undefined,
+    customLumensPerSqFt:
+      roomType === 'other' && customRoomLumens
+        ? parseFloat(customRoomLumens)
+        : customLumens
+        ? parseFloat(customLumens)
+        : undefined,
+    fixtureSize: fixtureSize || undefined,
+    customFixtureLumens: customFixtureLumens ? parseFloat(customFixtureLumens) : undefined,
+  }), [length, width, unitSystem, roomType, isExpert, ceilingHeight, slopedCeiling, ceilingPeakHeight, naturalLight, customRoomLumens, customLumens, fixtureSize, customFixtureLumens]);
+
+  // Apply a decoded/loaded input to the form state.
+  const applyInput = useCallback((input: CalculationInput) => {
+    setUnitSystem(input.unitSystem);
+    setLength(input.length.toString());
+    setWidth(input.width.toString());
+    setRoomType(input.roomType);
+    setIsExpert(input.isExpert);
+    setCeilingHeight(input.ceilingHeight?.toString() || '');
+    setSlopedCeiling(input.slopedCeiling ?? false);
+    setCeilingPeakHeight(input.ceilingPeakHeight?.toString() || '');
+    setNaturalLight(input.naturalLight ?? 'none');
+    setCustomLumens(input.customLumensPerSqFt?.toString() || '');
+    setFixtureSize(input.fixtureSize || '');
+    setCustomFixtureLumens(input.customFixtureLumens?.toString() || '');
+  }, []);
+
+  // Load a shared configuration from the URL (?c=...) on first render.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const encoded = new URLSearchParams(window.location.search).get('c');
+    if (!encoded) return;
+    const input = decodeInput(encoded);
+    if (input) {
+      applyInput(input);
+      setResult(calculateLighting(input));
+    }
+  }, [applyInput]);
+
+  const handleShare = async () => {
+    const url = buildShareUrl(buildInput());
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    } catch {
+      window.prompt('Copy this share link:', url);
+    }
+  };
 
   const handleCalculate = () => {
     if (!length || !width || !roomType) {
@@ -45,42 +114,13 @@ export default function FullLightingCalculator() {
       }
     }
 
-    const input: CalculationInput = {
-      length: parseFloat(length),
-      width: parseFloat(width),
-      unitSystem,
-      roomType,
-      isExpert,
-      customLumensPerSqFt: roomType === 'other' && customRoomLumens
-        ? parseFloat(customRoomLumens)
-        : customLumens
-        ? parseFloat(customLumens)
-        : undefined,
-      fixtureSize: fixtureSize || undefined,
-      customFixtureLumens: customFixtureLumens ? parseFloat(customFixtureLumens) : undefined,
-    };
-
-    const calculationResult = calculateLighting(input);
-    setResult(calculationResult);
+    setResult(calculateLighting(buildInput()));
   };
 
   const handleSave = () => {
     if (!result) return;
 
-    const input: CalculationInput = {
-      length: parseFloat(length),
-      width: parseFloat(width),
-      unitSystem,
-      roomType,
-      isExpert,
-      customLumensPerSqFt: roomType === 'other' && customRoomLumens
-        ? parseFloat(customRoomLumens)
-        : customLumens
-        ? parseFloat(customLumens)
-        : undefined,
-      fixtureSize: fixtureSize || undefined,
-      customFixtureLumens: customFixtureLumens ? parseFloat(customFixtureLumens) : undefined,
-    };
+    const input = buildInput();
 
     const roomName = roomType === 'other' && customRoomName
       ? customRoomName
@@ -101,21 +141,25 @@ export default function FullLightingCalculator() {
 
   const handleLoad = (calculation: SavedCalculation) => {
     if (calculation.type !== 'full') return;
-
-    const input = calculation.input as CalculationInput;
-    setUnitSystem(input.unitSystem);
-    setLength(input.length.toString());
-    setWidth(input.width.toString());
-    setRoomType(input.roomType);
-    setIsExpert(input.isExpert);
-    setCustomLumens(input.customLumensPerSqFt?.toString() || '');
-    setFixtureSize(input.fixtureSize || '');
-    setCustomFixtureLumens(input.customFixtureLumens?.toString() || '');
+    applyInput(calculation.input as CalculationInput);
     setResult(calculation.result as CalculationResult);
+  };
+
+  const applyPreset = (preset: RoomPreset) => {
+    const dims = presetDimensions(preset, unitSystem);
+    setLength(dims.length);
+    setWidth(dims.width);
+    setCeilingHeight(dims.ceiling);
+    setRoomType(preset.roomType);
+    setResult(null);
   };
 
   const getDimensionLabel = () => {
     return unitSystem === 'metric' ? 'millimeters (mm) or meters (m)' : 'inches or feet';
+  };
+
+  const getCeilingLabel = () => {
+    return unitSystem === 'metric' ? 'meters (m)' : 'feet (ft)';
   };
 
   return (
@@ -123,6 +167,35 @@ export default function FullLightingCalculator() {
       <div className="flex justify-end">
         <SavedCalculations onLoad={handleLoad} />
       </div>
+
+      {/* Quick-apply room presets */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Wand2 className="h-4 w-4 text-brand-bronze" />
+            Quick Start Templates
+          </CardTitle>
+          <CardDescription>
+            Apply a common room size, then fine-tune the numbers below.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            {ROOM_PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => applyPreset(preset)}
+                className="group rounded-lg border border-border bg-muted/30 px-3 py-2 text-left transition-colors hover:border-brand-bronze hover:bg-accent/60"
+              >
+                <span className="block text-sm font-medium">{preset.label}</span>
+                <span className="block text-xs text-muted-foreground">{preset.blurb}</span>
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -183,6 +256,73 @@ export default function FullLightingCalculator() {
                 onChange={(e) => setWidth(e.target.value)}
               />
             </div>
+          </div>
+
+          {/* Ceiling Height */}
+          <div className="space-y-2">
+            <Label htmlFor="ceilingHeight" className="flex items-center gap-1.5">
+              <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+              Ceiling Height <span className="text-muted-foreground text-xs">({getCeilingLabel()}, optional)</span>
+            </Label>
+            <Input
+              id="ceilingHeight"
+              type="number"
+              placeholder={unitSystem === 'metric' ? '2.7' : '8'}
+              value={ceilingHeight}
+              onChange={(e) => setCeilingHeight(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Taller ceilings need more output to reach the floor. Leave blank to assume a standard{' '}
+              {unitSystem === 'metric' ? '2.4 m' : '8 ft'} ceiling.
+            </p>
+          </div>
+
+          {/* Sloped / vaulted ceiling */}
+          <div className="space-y-3">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-input accent-[hsl(var(--brand-bronze))]"
+                checked={slopedCeiling}
+                onChange={(e) => setSlopedCeiling(e.target.checked)}
+              />
+              <span className="text-sm font-medium">Sloped / vaulted ceiling</span>
+            </label>
+            {slopedCeiling && (
+              <div className="space-y-2 pl-6">
+                <Label htmlFor="ceilingPeak">
+                  Peak Height <span className="text-muted-foreground text-xs">({getCeilingLabel()})</span>
+                </Label>
+                <Input
+                  id="ceilingPeak"
+                  type="number"
+                  placeholder={unitSystem === 'metric' ? '3.6' : '12'}
+                  value={ceilingPeakHeight}
+                  onChange={(e) => setCeilingPeakHeight(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  We design to the average of the wall height (above) and this peak.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Natural light */}
+          <div className="space-y-2">
+            <Label htmlFor="naturalLight">Natural Light</Label>
+            <Select value={naturalLight} onValueChange={(v) => setNaturalLight(v as NaturalLightLevel)}>
+              <SelectTrigger id="naturalLight">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No / minimal windows</SelectItem>
+                <SelectItem value="some">Some daylight (standard windows)</SelectItem>
+                <SelectItem value="ample">Ample daylight (large windows / skylights)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Daylight offsets artificial lighting needs by up to 20%.
+            </p>
           </div>
 
           {/* Room Type */}
@@ -323,8 +463,8 @@ export default function FullLightingCalculator() {
       {/* Results */}
       {result && (
         <>
-          <div className="flex items-end justify-end gap-3">
-            <div className="flex-1 max-w-md space-y-1">
+          <div className="flex flex-wrap items-end justify-end gap-3">
+            <div className="min-w-[200px] flex-1 max-w-md space-y-1">
               <Label htmlFor="description-full" className="text-sm">
                 Description (optional)
               </Label>
@@ -336,6 +476,10 @@ export default function FullLightingCalculator() {
                 onChange={(e) => setDescription(e.target.value)}
               />
             </div>
+            <Button onClick={handleShare} variant="outline" className="gap-2">
+              {shareCopied ? <Check className="h-4 w-4 text-brand-sage" /> : <Share2 className="h-4 w-4" />}
+              {shareCopied ? 'Link copied' : 'Share'}
+            </Button>
             <PDFExport
               result={result}
               roomType={roomType}
@@ -388,6 +532,25 @@ export default function FullLightingCalculator() {
                   <span className="text-muted-foreground">Lumens per Sq Ft:</span>
                   <span className="font-semibold">{result.lumensPerSqFt}</span>
                 </div>
+                {result.ceilingFactor != null && result.ceilingFactor !== 1 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">
+                      Ceiling Adjustment ({result.ceilingHeightFt?.toFixed(1)} ft):
+                    </span>
+                    <span className="font-semibold text-brand-bronze">
+                      {result.ceilingFactor > 1 ? '+' : ''}
+                      {Math.round((result.ceilingFactor - 1) * 100)}%
+                    </span>
+                  </div>
+                )}
+                {result.naturalLightFactor != null && result.naturalLightFactor !== 1 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Daylight Reduction:</span>
+                    <span className="font-semibold text-brand-sage">
+                      −{Math.round((1 - result.naturalLightFactor) * 100)}%
+                    </span>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -470,6 +633,18 @@ export default function FullLightingCalculator() {
             </CardContent>
           </Card>
         </div>
+
+          {/* Layered lighting plan */}
+          <LightingZones roomType={roomType} totalLumens={result.totalLumensNeeded} />
+
+          {/* Cost & Energy */}
+          <CostEnergyEstimator result={result} />
+
+          {/* Product recommendations */}
+          <ProductRecommendations
+            roomType={roomType}
+            ceilingHeightFt={result.ceilingHeightFt ?? 8}
+          />
 
           {/* Shopping List */}
           <ShoppingList

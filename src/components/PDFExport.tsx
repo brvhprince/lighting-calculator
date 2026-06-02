@@ -32,7 +32,12 @@ ROOM DETAILS
 LIGHTING REQUIREMENTS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   Total Lumens Needed: ${result.totalLumensNeeded.toLocaleString()} lumens
-  Lumens per Square Foot: ${result.lumensPerSqFt} lumens/ft²
+  Lumens per Square Foot: ${result.lumensPerSqFt} lumens/ft²${
+    result.ceilingFactor != null && result.ceilingFactor !== 1
+      ? `
+  Ceiling Height: ${result.ceilingHeightFt.toFixed(1)} ft (${result.ceilingFactor > 1 ? '+' : ''}${Math.round((result.ceilingFactor - 1) * 100)}% adjustment applied)`
+      : ''
+  }
 
 FIXTURE SPECIFICATIONS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

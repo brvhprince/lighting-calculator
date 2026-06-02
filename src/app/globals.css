@@ -2,50 +2,73 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Pen Homes Design System
+ * Penlabs (lighting) palette — Deep Basalt + Bronze/Brass for precision & premium feel.
+ *   Deep Basalt  #2C332E  -> 137 8% 19%
+ *   Warm Bone    #F5F2ED  -> 38 29% 95%
+ *   Warm Linen   #F2EFE9  -> 40 26% 93%
+ *   Bronze/Brass #A68966  -> 33 26% 53%
+ *   Muted Sage   #8A9682  -> 96 9% 55%
+ */
+
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
+    --background: 40 26% 93%;      /* Warm Linen */
+    --foreground: 137 10% 15%;     /* Deep Basalt (slightly deepened for contrast) */
+    --card: 38 33% 97%;            /* Warm Bone, lifted */
+    --card-foreground: 137 10% 15%;
+    --popover: 38 33% 97%;
+    --popover-foreground: 137 10% 15%;
+    --primary: 137 8% 19%;         /* Deep Basalt */
+    --primary-foreground: 38 29% 95%;
+    --secondary: 96 12% 88%;       /* Muted Sage tint */
+    --secondary-foreground: 137 10% 20%;
+    --muted: 36 18% 89%;
+    --muted-foreground: 137 6% 38%;
+    --accent: 33 32% 88%;          /* Bronze tint */
+    --accent-foreground: 33 42% 24%;
+    --destructive: 0 58% 45%;
+    --destructive-foreground: 38 29% 95%;
+    --border: 36 16% 84%;
+    --input: 36 16% 84%;
+    --ring: 33 26% 53%;            /* Bronze */
     --radius: 0.5rem;
+
+    /* Brand tokens (raw HSL channels) */
+    --brand-basalt: 137 8% 19%;
+    --brand-bone: 38 29% 95%;
+    --brand-linen: 40 26% 93%;
+    --brand-bronze: 33 26% 53%;
+    --brand-sage: 96 9% 55%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    --background: 137 10% 11%;     /* Deep Basalt, near-black */
+    --foreground: 38 24% 92%;      /* Warm Bone */
+    --card: 137 9% 14%;
+    --card-foreground: 38 24% 92%;
+    --popover: 137 9% 14%;
+    --popover-foreground: 38 24% 92%;
+    --primary: 33 30% 56%;         /* Bronze leads in dark for visibility */
+    --primary-foreground: 137 12% 12%;
+    --secondary: 137 8% 20%;
+    --secondary-foreground: 38 24% 92%;
+    --muted: 137 8% 18%;
+    --muted-foreground: 38 12% 65%;
+    --accent: 137 8% 22%;
+    --accent-foreground: 33 40% 70%;
+    --destructive: 0 55% 42%;
+    --destructive-foreground: 38 24% 92%;
+    --border: 137 8% 22%;
+    --input: 137 8% 22%;
+    --ring: 33 30% 56%;
+
+    --brand-basalt: 137 8% 19%;
+    --brand-bone: 38 29% 95%;
+    --brand-linen: 40 26% 93%;
+    --brand-bronze: 33 30% 56%;
+    --brand-sage: 96 9% 55%;
   }
 }
 
@@ -55,6 +78,12 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "ss01", "cv01", "cv11";
+  }
+  /* Serif display type for headings — the architectural / luxury voice */
+  h1, h2, .font-display {
+    font-family: var(--font-serif), ui-serif, Georgia, serif;
+    letter-spacing: -0.01em;
   }
 }
 

@@ -18,8 +18,25 @@ export function calculateLighting(input: CalculationInput): CalculationResult {
     ROOM_TYPES[input.roomType]?.lumensPerSqFt.recommended ||
     25;
 
-  // Step 3: Calculate total lumens needed
-  const totalLumensNeeded = Math.ceil(areaInSqFt * lumensPerSqFt);
+  // Step 3: Calculate base lumens, then adjust for ceiling height.
+  // Light spreads and attenuates with mounting height. A standard residential
+  // ceiling is 8 ft; taller ceilings need proportionally more output to land the
+  // same illuminance on the working plane (~10% per foot above 8 ft).
+  const baseLumensNeeded = Math.ceil(areaInSqFt * lumensPerSqFt);
+
+  // For a sloped/vaulted ceiling, light is designed to the average height
+  // between the low (wall) side and the high (peak) side.
+  let ceilingHeightFt = resolveCeilingHeightFt(input.ceilingHeight, input.unitSystem);
+  if (input.slopedCeiling && input.ceilingPeakHeight) {
+    const peakFt = resolveCeilingHeightFt(input.ceilingPeakHeight, input.unitSystem);
+    ceilingHeightFt = (ceilingHeightFt + peakFt) / 2;
+  }
+  const ceilingFactor = computeCeilingFactor(ceilingHeightFt);
+
+  // Natural daylight from windows/skylights offsets some artificial light.
+  const naturalLightFactor = naturalLightMultiplier(input.naturalLight);
+
+  const totalLumensNeeded = Math.ceil(baseLumensNeeded * ceilingFactor * naturalLightFactor);
 
   // Step 4: Determine lumens per fixture
   let lumensPerFixture: number;
@@ -59,13 +76,19 @@ export function calculateLighting(input: CalculationInput): CalculationResult {
     areaInSqFt,
     numberOfFixtures,
     lumensPerFixture,
-    totalLumensNeeded
+    totalLumensNeeded,
+    ceilingHeightFt,
+    ceilingFactor
   );
 
   return {
     area,
     areaUnit: input.unitSystem === 'metric' ? 'm²' : 'ft²',
     totalLumensNeeded,
+    baseLumensNeeded,
+    ceilingHeightFt,
+    ceilingFactor,
+    naturalLightFactor,
     lumensPerSqFt,
     lumensPerFixture,
     numberOfFixtures,
@@ -73,6 +96,44 @@ export function calculateLighting(input: CalculationInput): CalculationResult {
     spacing,
     recommendations
   };
+}
+
+const FEET_PER_METER = 3.28084;
+const STANDARD_CEILING_FT = 8;
+
+// Resolve a ceiling-height input (given in the active unit system) to feet.
+// Falls back to the standard 8 ft ceiling when not provided.
+function resolveCeilingHeightFt(ceilingHeight: number | undefined, unitSystem: UnitSystem): number {
+  if (!ceilingHeight || ceilingHeight <= 0) return STANDARD_CEILING_FT;
+  if (unitSystem === 'metric') {
+    // Accept meters (e.g. 2.7) or millimeters (e.g. 2700)
+    const meters = ceilingHeight > 30 ? ceilingHeight * MM_TO_METERS : ceilingHeight;
+    return meters * FEET_PER_METER;
+  }
+  // Imperial: accept feet (e.g. 9) or inches (e.g. 108)
+  return ceilingHeight > 30 ? ceilingHeight * INCHES_TO_FEET : ceilingHeight;
+}
+
+// ~10% more output per foot above the 8 ft standard, with a sensible cap so very
+// high (vaulted) ceilings don't produce runaway numbers. Lower ceilings get a
+// small reduction.
+export function computeCeilingFactor(ceilingHeightFt: number): number {
+  const delta = ceilingHeightFt - STANDARD_CEILING_FT;
+  const factor = 1 + delta * 0.1;
+  return Math.min(2, Math.max(0.85, parseFloat(factor.toFixed(3))));
+}
+
+// Daylight offsets artificial lighting needs. Conservative reductions so rooms
+// are never under-lit at night.
+function naturalLightMultiplier(level: import('@/types').NaturalLightLevel | undefined): number {
+  switch (level) {
+    case 'some':
+      return 0.9;
+    case 'ample':
+      return 0.8;
+    default:
+      return 1;
+  }
 }
 
 export function calculateLumensOnly(
@@ -215,7 +276,9 @@ function generateRecommendations(
   areaInSqFt: number,
   numberOfFixtures: number,
   lumensPerFixture: number,
-  totalLumensNeeded: number
+  totalLumensNeeded: number,
+  ceilingHeightFt: number,
+  ceilingFactor: number
 ): string[] {
   const recommendations: string[] = [];
 
@@ -244,6 +307,32 @@ function generateRecommendations(
   recommendations.push(
     'Spacing between lights should be twice the distance from the wall to the first light.'
   );
+
+  // Ceiling-height guidance
+  if (ceilingFactor > 1) {
+    recommendations.push(
+      `Your ${ceilingHeightFt.toFixed(1)} ft ceiling raises the required output by ${Math.round((ceilingFactor - 1) * 100)}% versus a standard 8 ft ceiling — already factored into the totals above.`
+    );
+  }
+  if (input.naturalLight === 'ample') {
+    recommendations.push(
+      'Ample daylight lets us trim artificial output by ~20%. Pair with dimmers and daylight sensors to capture the savings without losing brightness after dark.'
+    );
+  } else if (input.naturalLight === 'some') {
+    recommendations.push(
+      'Some natural light reduces the artificial requirement by ~10%. Zone window-side fixtures separately so they can dim independently during the day.'
+    );
+  }
+
+  if (ceilingHeightFt >= 10) {
+    recommendations.push(
+      'For ceilings 10 ft and higher, choose fixtures with a narrower beam angle (≤40°) or higher lumen output to keep light from dispersing before it reaches the floor.'
+    );
+  } else if (ceilingHeightFt < 8) {
+    recommendations.push(
+      'On lower ceilings, favour wide-beam (>60°) trims and dimmable fixtures to avoid hot-spots and glare.'
+    );
+  }
 
   if (numberOfFixtures < 4) {
     recommendations.push(

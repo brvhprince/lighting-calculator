@@ -1,7 +1,7 @@
 {
   "name": "pen-lighting-calculator",
-  "version": "1.0.0",
-  "description": "Professional lighting calculator by Pen Homes",
+  "version": "2.0.0",
+  "description": "Penlabs Lighting Calculator — professional lighting design suite by Pen Homes",
   "private": true,
   "scripts": {
     "dev": "next dev",
