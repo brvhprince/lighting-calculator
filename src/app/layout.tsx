@@ -4,6 +4,8 @@ import "./globals.css";
 import Link from "next/link";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { CurrencyProvider } from "@/context/CurrencyProvider";
+import { CurrencySelector } from "@/components/CurrencySelector";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -68,6 +70,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning className={`${inter.variable} ${playfair.variable}`}>
       <body className="font-sans antialiased">
         <ThemeProvider>
+        <CurrencyProvider>
           <div className="min-h-screen bg-background">
             <nav className="border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-50">
               <div className="container mx-auto px-4 py-4">
@@ -110,6 +113,7 @@ export default function RootLayout({
                     >
                       Lumens
                     </Link>
+                    <CurrencySelector />
                     <ThemeToggle />
                   </div>
                 </div>
@@ -127,6 +131,7 @@ export default function RootLayout({
               </div>
             </footer>
           </div>
+        </CurrencyProvider>
         </ThemeProvider>
       </body>
     </html>

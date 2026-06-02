@@ -23,6 +23,8 @@ import {
   importProject,
 } from '@/lib/projects';
 import { getSavedCalculations } from '@/lib/savedCalculations';
+import { useCurrency } from '@/context/CurrencyProvider';
+import { fixtureCostRange } from '@/config/markets';
 import { Project } from '@/types/project';
 import { SavedCalculation } from '@/types/saved-calculations';
 import {
@@ -61,6 +63,18 @@ export default function ProjectManager() {
     [projects, activeId]
   );
   const totals = useMemo(() => (active ? projectTotals(active) : null), [active]);
+  const { market, format } = useCurrency();
+  // Cost is computed live from the selected currency/market, not stored amounts.
+  const costTotals = useMemo(() => {
+    if (!active) return { low: 0, high: 0 };
+    return active.rooms.reduce(
+      (acc, r) => {
+        const c = fixtureCostRange(r.numberOfFixtures, market);
+        return { low: acc.low + c.low, high: acc.high + c.high };
+      },
+      { low: 0, high: 0 }
+    );
+  }, [active, market]);
 
   const handleCreate = () => {
     if (!newName.trim()) return;
@@ -260,7 +274,7 @@ export default function ProjectManager() {
                   <Tile label="Total lumens" value={totals.totalLumens.toLocaleString()} />
                   <Tile
                     label="Est. material cost"
-                    value={`$${totals.costLow.toLocaleString()}–${totals.costHigh.toLocaleString()}`}
+                    value={`${format(costTotals.low)}–${format(costTotals.high)}`}
                     emphasis
                   />
                 </div>
@@ -291,7 +305,10 @@ export default function ProjectManager() {
                             </td>
                             <td className="py-2 pr-4">{r.totalLumens.toLocaleString()}</td>
                             <td className="py-2 pr-4">
-                              ${r.estCostLow.toLocaleString()}–${r.estCostHigh.toLocaleString()}
+                              {(() => {
+                                const c = fixtureCostRange(r.numberOfFixtures, market);
+                                return `${format(c.low)}–${format(c.high)}`;
+                              })()}
                             </td>
                             <td className="py-2 print:hidden">
                               <button

@@ -1,17 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { CalculationResult } from '@/types';
-import {
-  CostInputs,
-  DEFAULT_COST_INPUTS,
-  estimateCost,
-  formatCurrency,
-} from '@/lib/costEstimator';
+import { CostInputs, costInputsFromMarket, estimateCost } from '@/lib/costEstimator';
+import { useCurrency } from '@/context/CurrencyProvider';
 import { DollarSign, Zap, Leaf, TrendingDown } from 'lucide-react';
 
 type Props = {
@@ -19,7 +15,13 @@ type Props = {
 };
 
 export function CostEnergyEstimator({ result }: Props) {
-  const [inputs, setInputs] = useState<CostInputs>(DEFAULT_COST_INPUTS);
+  const { market, format } = useCurrency();
+  const [inputs, setInputs] = useState<CostInputs>(() => costInputsFromMarket(market));
+
+  // Re-seed price/energy defaults from the market when the currency changes.
+  useEffect(() => {
+    setInputs(costInputsFromMarket(market));
+  }, [market]);
 
   const estimate = useMemo(() => estimateCost(result, inputs), [result, inputs]);
 
@@ -30,7 +32,7 @@ export function CostEnergyEstimator({ result }: Props) {
     update({ [key]: isNaN(value) ? 0 : value } as Partial<CostInputs>);
   };
 
-  const c = inputs.currency;
+  const c = market.symbol;
 
   return (
     <Card>
@@ -124,18 +126,18 @@ export function CostEnergyEstimator({ result }: Props) {
 
         {/* Up-front cost */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <StatTile label="Material cost" value={formatCurrency(estimate.materialCost, c)} />
+          <StatTile label="Material cost" value={format(estimate.materialCost)} />
           <StatTile
             label="Installation"
             value={
               inputs.installMode === 'professional'
-                ? formatCurrency(estimate.installationCost, c)
-                : 'DIY · ' + formatCurrency(0, c)
+                ? format(estimate.installationCost)
+                : 'DIY · ' + format(0)
             }
           />
           <StatTile
             label="Total up-front"
-            value={formatCurrency(estimate.upfrontCost, c)}
+            value={format(estimate.upfrontCost)}
             emphasis
           />
         </div>
@@ -150,7 +152,7 @@ export function CostEnergyEstimator({ result }: Props) {
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">LED ({estimate.ledWatts} W total)</p>
               <p className="text-2xl font-semibold">
-                {formatCurrency(estimate.annualEnergyCostLed, c)}
+                {format(estimate.annualEnergyCostLed)}
                 <span className="text-sm font-normal text-muted-foreground">/yr</span>
               </p>
               <p className="text-xs text-muted-foreground">{estimate.annualKwhLed} kWh per year</p>
@@ -160,7 +162,7 @@ export function CostEnergyEstimator({ result }: Props) {
                 Incandescent ({estimate.incandescentWatts} W total)
               </p>
               <p className="text-2xl font-semibold text-muted-foreground line-through decoration-1">
-                {formatCurrency(estimate.annualEnergyCostIncandescent, c)}
+                {format(estimate.annualEnergyCostIncandescent)}
                 <span className="text-sm font-normal">/yr</span>
               </p>
               <p className="text-xs text-muted-foreground">
@@ -177,11 +179,11 @@ export function CostEnergyEstimator({ result }: Props) {
               <TrendingDown className="h-4 w-4" /> LED saves you
             </p>
             <p className="text-2xl font-semibold text-foreground">
-              {formatCurrency(estimate.annualSavings, c)}
+              {format(estimate.annualSavings)}
               <span className="text-sm font-normal text-muted-foreground">/yr</span>
             </p>
             <p className="text-xs text-muted-foreground">
-              {formatCurrency(estimate.tenYearSavings, c)} over 10 years
+              {format(estimate.tenYearSavings)} over 10 years
             </p>
           </div>
           <StatTile

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ShoppingCart, Printer, Check } from 'lucide-react';
 import { ROOM_TYPES } from '@/lib/roomTypes';
+import { useCurrency } from '@/context/CurrencyProvider';
 
 type ShoppingListProps = {
   result: CalculationResult;
@@ -14,19 +15,20 @@ type ShoppingListProps = {
 
 export function ShoppingList({ result, roomType, customRoomName }: ShoppingListProps) {
   const roomName = customRoomName || ROOM_TYPES[roomType]?.name || 'Room';
+  const { market, format } = useCurrency();
 
   const handlePrint = () => {
     window.print();
   };
 
   const fixtureEstimate = {
-    low: Math.round(result.numberOfFixtures * 20),
-    high: Math.round(result.numberOfFixtures * 50),
+    low: Math.round(result.numberOfFixtures * market.fixturePriceLow),
+    high: Math.round(result.numberOfFixtures * market.fixturePriceHigh),
   };
 
   const hardwareEstimate = {
-    low: 40,
-    high: 100,
+    low: market.hardwareLow,
+    high: market.hardwareHigh,
   };
 
   const totalEstimate = {
@@ -169,21 +171,24 @@ export function ShoppingList({ result, roomType, customRoomName }: ShoppingListP
           </h3>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span>Fixtures ({result.numberOfFixtures}× at $20-50 each):</span>
+              <span>
+                Fixtures ({result.numberOfFixtures}× at {format(market.fixturePriceLow)}–
+                {format(market.fixturePriceHigh)} each):
+              </span>
               <span className="font-medium">
-                ${fixtureEstimate.low} - ${fixtureEstimate.high}
+                {format(fixtureEstimate.low)} – {format(fixtureEstimate.high)}
               </span>
             </div>
             <div className="flex justify-between">
               <span>Hardware & Supplies:</span>
               <span className="font-medium">
-                ${hardwareEstimate.low} - ${hardwareEstimate.high}
+                {format(hardwareEstimate.low)} – {format(hardwareEstimate.high)}
               </span>
             </div>
             <div className="flex justify-between font-bold text-base border-t pt-2">
               <span>Total Estimated Cost:</span>
               <span className="text-primary">
-                ${totalEstimate.low} - ${totalEstimate.high}
+                {format(totalEstimate.low)} – {format(totalEstimate.high)}
               </span>
             </div>
           </div>

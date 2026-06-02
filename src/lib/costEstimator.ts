@@ -1,4 +1,5 @@
 import { CalculationResult } from '@/types';
+import { Market } from '@/config/markets';
 
 // Luminous efficacy (lumens per watt) by bulb technology.
 // LED is the modern baseline; incandescent/halogen are the legacy comparison.
@@ -17,21 +18,21 @@ export type CostInputs = {
   installCostPerFixture: number; // labour per fixture when professional
   hoursPerDay: number; // average daily usage
   electricityRate: number; // currency per kWh
-  currency: string; // symbol, e.g. "$"
 };
 
-export const DEFAULT_COST_INPUTS: CostInputs = {
-  fixtureUnitPrice: 35,
-  hardwareCost: 80,
-  installMode: 'diy',
-  installCostPerFixture: 90,
-  hoursPerDay: 4,
-  electricityRate: 0.17,
-  currency: '$',
-};
+// Seed the editable cost assumptions from the selected market.
+export function costInputsFromMarket(market: Market): CostInputs {
+  return {
+    fixtureUnitPrice: market.fixtureUnitPrice,
+    hardwareCost: market.hardwareCost,
+    installMode: 'diy',
+    installCostPerFixture: market.installCostPerFixture,
+    hoursPerDay: 4,
+    electricityRate: market.electricityRate,
+  };
+}
 
 export type CostEstimate = {
-  currency: string;
   fixtureCount: number;
   // Up-front
   materialCost: number;
@@ -57,8 +58,8 @@ export type CostEstimate = {
 // Average grid emissions factor (kg CO2 per kWh). US/global rough average.
 const CO2_PER_KWH = 0.4;
 // Rough premium of an LED fixture over an equivalent incandescent setup, used
-// only to estimate payback of going LED.
-const LED_PREMIUM_PER_FIXTURE = 12;
+// only to estimate payback of going LED (in the active currency).
+const LED_PREMIUM_FRACTION = 0.35; // ~35% of the fixture price
 
 export function estimateCost(result: CalculationResult, inputs: CostInputs): CostEstimate {
   const fixtureCount = result.numberOfFixtures;
@@ -87,11 +88,10 @@ export function estimateCost(result: CalculationResult, inputs: CostInputs): Cos
   const annualCo2KgLed = round2(annualKwhLed * CO2_PER_KWH);
   const annualCo2SavedKg = round2((annualKwhIncandescent - annualKwhLed) * CO2_PER_KWH);
 
-  const ledPremium = fixtureCount * LED_PREMIUM_PER_FIXTURE;
+  const ledPremium = fixtureCount * inputs.fixtureUnitPrice * LED_PREMIUM_FRACTION;
   const paybackYears = annualSavings > 0 ? round2(ledPremium / annualSavings) : null;
 
   return {
-    currency: inputs.currency,
     fixtureCount,
     materialCost,
     installationCost,
@@ -112,11 +112,4 @@ export function estimateCost(result: CalculationResult, inputs: CostInputs): Cos
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
-}
-
-export function formatCurrency(value: number, currency: string): string {
-  return `${currency}${value.toLocaleString(undefined, {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })}`;
 }

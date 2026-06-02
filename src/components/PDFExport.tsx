@@ -4,6 +4,7 @@ import { CalculationResult } from '@/types';
 import { Button } from '@/components/ui/button';
 import { FileDown } from 'lucide-react';
 import { ROOM_TYPES } from '@/lib/roomTypes';
+import { useCurrency } from '@/context/CurrencyProvider';
 
 type PDFExportProps = {
   result: CalculationResult;
@@ -12,6 +13,7 @@ type PDFExportProps = {
 };
 
 export function PDFExport({ result, roomType, customRoomName }: PDFExportProps) {
+  const { market, format } = useCurrency();
   const handleExport = () => {
     const roomName = customRoomName || ROOM_TYPES[roomType]?.name || 'Room';
     const date = new Date().toLocaleDateString();
@@ -84,10 +86,10 @@ TOOLS NEEDED:
   □ Wire strippers and cutters
   □ Drill and driver bits
 
-ESTIMATED COST:
-  Fixtures: $${Math.round(result.numberOfFixtures * 20)} - $${Math.round(result.numberOfFixtures * 50)}
-  Hardware: $40 - $100
-  Total: $${Math.round(result.numberOfFixtures * 20 + 40)} - $${Math.round(result.numberOfFixtures * 50 + 100)}
+ESTIMATED COST (${market.code}):
+  Fixtures: ${format(result.numberOfFixtures * market.fixturePriceLow)} - ${format(result.numberOfFixtures * market.fixturePriceHigh)}
+  Hardware: ${format(market.hardwareLow)} - ${format(market.hardwareHigh)}
+  Total: ${format(result.numberOfFixtures * market.fixturePriceLow + market.hardwareLow)} - ${format(result.numberOfFixtures * market.fixturePriceHigh + market.hardwareHigh)}
 
 INSTALLATION NOTES:
   • Space fixtures ${result.spacing.betweenFixtures} ${result.spacing.unit} apart
