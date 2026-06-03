@@ -18,7 +18,8 @@ Pen Homes standard.
 | `/designer` | **Room Designer** | Draw rectangular, L-, T- or freeform rooms **to scale** and auto-place fixtures |
 | `/project` | **Projects** | Group rooms into a whole-home project with cost rollup + exportable report |
 | `/lumens-calculator` | **Lumens Only** | Fast, room-aware total-lumens estimate |
-| `/admin` | **Configuration** | Edit prices, electricity rates & currency values (JSON), no code changes |
+| `/admin` | **Configuration** | Edit prices/currencies (JSON) + view incoming quote requests — passcode-gated |
+| `/r/[code]` | **Shared report** | Public, read-only client report for a published project |
 
 ### Editing prices & currencies
 
@@ -38,15 +39,34 @@ USD / GHS). At runtime those defaults are **overridden by values saved in the da
 | `DATABASE_URL` | Prisma Postgres (Accelerate) connection string |
 | `AUTH_SECRET` | Signs the short-lived admin session token |
 | `ADMIN_PASSCODE` | Passcode for `/admin` (defaults to `penlabs` if unset) |
+| `NEXT_PUBLIC_SITE_URL` | Canonical site URL for metadata/OG/sitemap (defaults to `https://lighting.pen.homes`) |
+| `RESEND_API_KEY` | Resend key for quote emails (optional — email is skipped if unset) |
+| `LEAD_FROM_EMAIL` | Verified sender (defaults to `Pen Homes <hello@mail.pen.homes>`) |
+| `LEAD_REPLY_TO` | Reply-to for customer auto-replies (defaults to `hello@pen.homes`) |
+| `LEAD_NOTIFY_EMAIL` | Internal recipient for new-lead notifications (optional) |
+| `LEAD_CONSULT_URL` | Booking link (e.g. Cal.com) — adds a "Book a consultation" email CTA when set |
+| `NEXT_PUBLIC_PENCASA_URL` | Pencasa store URL — shows a "Shop at Pencasa" CTA (app + email) when set |
+
+> **Resend setup:** verify the **`mail.pen.homes`** subdomain in Resend (add the SPF/DKIM/DMARC
+> records) so emails send from `hello@mail.pen.homes` with replies routed to `hello@pen.homes`.
+> Sending from a subdomain protects the root domain's email reputation.
+>
+> **Click tracking:** `links.pen.homes` (CNAME → `links1.resend-dns.com`) is Resend's tracking domain.
+> Enable **click & open tracking** for the sending domain in the Resend dashboard and Resend rewrites
+> email links through it automatically. The email CTAs are UTM-tagged so your web analytics also
+> attributes the landings.
 
 #### Database setup (one-time)
 
 `prisma.config.ts` loads `.env.local`, so the CLI picks up `DATABASE_URL` automatically:
 
 ```bash
-npm run db:push   # create the Setting table
-npm run db:seed   # seed it from src/config/markets.ts (optional)
+npm run db:push   # create / update tables: Setting, Lead, SharedProject
+npm run db:seed   # seed market config from src/config/markets.ts (optional)
 ```
+
+Re-run `npm run db:push` whenever the Prisma schema changes. Tables: **Setting** (pricing
+config), **Lead** (quote requests), **SharedProject** (published project reports).
 
 Stack: **Prisma 7** with the `prisma-client` generator (output `src/generated/prisma`, git-ignored,
 regenerated on each build) and Prisma Postgres via **Accelerate** — the connection is passed to the
@@ -82,6 +102,7 @@ during the build; set the env vars in Project → Settings → Environment Varia
 - **Tailwind CSS** with the Pen Homes design system (Deep Basalt, Warm Bone/Linen, Bronze, Sage)
 - **Radix UI** primitives · **Lucide** icons · **Inter** + **Playfair Display** typography
 - HTML Canvas for the room designer (no heavy 3D dependency)
+- **Prisma 7** + **Prisma Postgres** (Accelerate) — persists the saved pricing/market config
 
 ## Getting started
 
@@ -97,17 +118,31 @@ npm run build
 npm start
 ```
 
-## Docker (Colima / Docker Desktop)
+## Self-hosting with Docker (Colima / Docker Desktop)
 
-The app persists everything client-side (browser `localStorage`), so **no database is required**.
+Production runs on **Vercel** with **Prisma Postgres**. The Docker setup is for self-hosting (e.g. on
+a VPS); the calculators and designer work fully client-side, and only the saved pricing config needs
+the database.
 
 ```bash
-docker compose up --build      # builds the standalone image and serves on :3000
+docker compose up --build      # builds the standalone image, serves on :3000
 ```
 
-The `Dockerfile` uses Next.js standalone output for a small runtime image, running as a non-root user.
-`docker-compose.yml` ships with a commented-out Postgres service: uncomment it (and the
-`DATABASE_URL` line) only if you later add server-side cloud sync / accounts.
+Provide the runtime environment variables (compose reads them from your shell or a root `.env`):
+
+| Var | Notes |
+|-----|-------|
+| `DATABASE_URL` | Prisma Postgres (Accelerate) URL. Omit it to run on the `markets.ts` defaults (admin saves are then disabled). |
+| `AUTH_SECRET` | Signs the admin session token. |
+| `ADMIN_PASSCODE` | `/admin` passcode (defaults to `penlabs`). |
+
+The `Dockerfile` uses Next.js standalone output for a small image and runs as a non-root user. The app
+**degrades gracefully** if the database is unreachable — everything except saving/loading the pricing
+config keeps working, with prices falling back to the `markets.ts` defaults.
+
+> The client connects through Accelerate (`accelerateUrl`). To point at a **self-managed** Postgres
+> instead of Prisma Postgres, switch `src/lib/prisma.ts` to a driver adapter (`@prisma/adapter-pg`)
+> with a direct `postgres://` URL.
 
 ## Project structure
 
@@ -146,3 +181,26 @@ src/
 ---
 
 **Built to the Pen Homes standard — intentional, invisible technology.**
+
+
+## research
+
+┌──────────────────────────────┬──────────────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────────────────────────┐
+│              Data              │                                International                                 │                                Ghana                                 │
+├────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────┼──────────────────────────────────────────────────────────────────────┤
+│ Fixture / hardware prices      │ Home Depot, Lowe's, Amazon; Signify/Philips, Cree, Lithonia, Halo spec+price │ Melcom, CompuGhana, Jumia GH, SuperPrice, local electrical importers │
+├────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────┼──────────────────────────────────────────────────────────────────────┤
+│ Electricity tariff (per kWh)   │ US EIA (eia.gov) residential averages                                        │ PURC (purc.com.gh) & ECG published residential tariffs               │
+├────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────┼──────────────────────────────────────────────────────────────────────┤
+│ Lumens / illuminance standards │ IES (Lighting Handbook, ANSI/IES recommended lux per room), Energy Star      │ same (IES is global)                                                 │
+├────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────┼──────────────────────────────────────────────────────────────────────┤
+│ CRI / colour temp / beam angle │ IES + manufacturer spec sheets; Energy Star LED criteria                     │ same                                                                 │
+├────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────┼──────────────────────────────────────────────────────────────────────┤
+│ Smart compatibility            │ CSA-IoT (Matter), Apple Home / Google Home / Alexa docs                      │ same                                                                 │
+├────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────┼──────────────────────────────────────────────────────────────────────┤
+│ CO₂ per kWh                    │ EPA eGRID (US), IEA                                                          │ Ghana Energy Commission grid emission factor                         │
+├────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────┼──────────────────────────────────────────────────────────────────────┤
+│ LED efficacy (lm/W)            │ US DOE / Energy Star LED specs                                               │ same                                                                 │
+└────────────────────────────────┴──────────────────────────────────────────────────────────────────────────────┴──────────────────────────────────────────────────────────────────────┘
+
+Tip: IES tables are in lux (lm/m²). Convert with lumens = lux × area_m² — handy if you want to cross-check the per-ft² values already in roomTypes.ts.

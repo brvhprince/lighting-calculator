@@ -17,3 +17,25 @@ model Setting {
   value     Json
   updatedAt DateTime @updatedAt
 }
+
+model Lead {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  name      String
+  email     String
+  phone     String?
+  message   String?
+  roomName  String?
+  source    String? // 'calculator' | 'designer'
+  data      Json? // spec snapshot
+}
+
+model SharedProject {
+  code      String   @id
+  editKey   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  name      String
+  client    String?
+  data      Json // { rooms, currency }
+}

@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { History, Trash2, Clock, Calculator, Lightbulb } from 'lucide-react';
+import { History, Trash2, Clock, Calculator, Lightbulb, Pentagon } from 'lucide-react';
 import { ROOM_TYPES } from '@/lib/roomTypes';
 
 type SavedCalculationsProps = {
@@ -93,7 +93,9 @@ export function SavedCalculations({ onLoad }: SavedCalculationsProps) {
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-2">
-                      {calc.type === 'full' ? (
+                      {calc.designer ? (
+                        <Pentagon className="h-4 w-4 text-brand-bronze" />
+                      ) : calc.type === 'full' ? (
                         <Calculator className="h-4 w-4 text-primary" />
                       ) : (
                         <Lightbulb className="h-4 w-4 text-primary" />

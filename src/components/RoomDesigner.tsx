@@ -26,12 +26,15 @@ import {
   FixturePlacement,
 } from '@/lib/geometry';
 import { ROOM_TYPES } from '@/lib/roomTypes';
-import { buildLightingResult } from '@/lib/calculator';
+import { buildLightingResult, dimToFeet } from '@/lib/calculator';
 import { CalculationInput, CalculationResult, UnitSystem, RoomConfigValue } from '@/types';
 import { saveCalculation, generateCalculationId } from '@/lib/savedCalculations';
-import { buildShareUrl, decodeDesigner } from '@/lib/shareUrl';
+import { SavedCalculation } from '@/types/saved-calculations';
+import { buildShareUrl, decodeDesigner, DesignerState } from '@/lib/shareUrl';
 import { LightingResults } from './LightingResults';
 import { RoomConfigFields, defaultRoomConfig } from './RoomConfigFields';
+import { resolveCustomLumensPerSqFt } from '@/lib/roomConfig';
+import { SavedCalculations } from './SavedCalculations';
 import { PDFExport } from './PDFExport';
 import {
   Pentagon,
@@ -232,12 +235,7 @@ export default function RoomDesigner() {
       config.sloped && config.ceilingPeakFt > 0
         ? (config.ceilingFt + config.ceilingPeakFt) / 2
         : config.ceilingFt;
-    const customLps =
-      config.roomType === 'other' && config.customRoomLumens
-        ? parseFloat(config.customRoomLumens)
-        : config.customLumensPerSqFt
-        ? parseFloat(config.customLumensPerSqFt)
-        : undefined;
+    const customLps = resolveCustomLumensPerSqFt(config);
     let placement: FixturePlacement = { points: [], spacingFt: 0 };
     const result = buildLightingResult({
       areaInSqFt: areaSqFt,
@@ -275,12 +273,7 @@ export default function RoomDesigner() {
       naturalLight: config.naturalLight !== 'none' ? config.naturalLight : undefined,
       fixtureSize: config.fixtureSize || undefined,
       customFixtureLumens: config.customFixtureLumens ? parseFloat(config.customFixtureLumens) : undefined,
-      customLumensPerSqFt:
-        config.roomType === 'other' && config.customRoomLumens
-          ? parseFloat(config.customRoomLumens)
-          : config.customLumensPerSqFt
-          ? parseFloat(config.customLumensPerSqFt)
-          : undefined,
+      customLumensPerSqFt: resolveCustomLumensPerSqFt(config),
     };
   };
 
@@ -298,9 +291,51 @@ export default function RoomDesigner() {
       type: 'full',
       input: buildInputFromDesign(),
       result: designed.result,
+      // Persist the actual drawn shape so it reopens exactly.
+      designer: { unit, config, points },
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  };
+
+  // Reopen a saved item: a drawn room restores its true polygon; a rectangular
+  // calculation opens as an editable rectangle.
+  const applyDesignerState = (st: DesignerState) => {
+    setUnit(st.unit);
+    setMode('free');
+    setConfig(st.config);
+    setPoints(st.points);
+    setClosed(true);
+    setScaleRatio('fit');
+    setSelectedEdge(null);
+    fitView(st.points);
+  };
+
+  const handleLoadSaved = (calc: SavedCalculation) => {
+    if (calc.designer) {
+      applyDesignerState(calc.designer);
+      return;
+    }
+    if (calc.type !== 'full') return;
+    const input = calc.input as CalculationInput;
+    const toFt = (v?: number) => (v ? dimToFeet(v, input.unitSystem) : 0);
+    applyDesignerState({
+      unit: input.unitSystem,
+      config: defaultRoomConfig({
+        roomType: input.roomType,
+        ceilingFt: input.ceilingHeight ? dimToFeet(input.ceilingHeight, input.unitSystem) : 8,
+        sloped: input.slopedCeiling ?? false,
+        ceilingPeakFt: input.ceilingPeakHeight ? dimToFeet(input.ceilingPeakHeight, input.unitSystem) : 0,
+        naturalLight: input.naturalLight ?? 'none',
+        fixtureSize: input.fixtureSize || '',
+        customFixtureLumens: input.customFixtureLumens?.toString() || '',
+        customLumensPerSqFt:
+          input.roomType !== 'other' && input.customLumensPerSqFt ? String(input.customLumensPerSqFt) : '',
+        customRoomLumens:
+          input.roomType === 'other' && input.customLumensPerSqFt ? String(input.customLumensPerSqFt) : '',
+      }),
+      points: rectangleShape(toFt(input.width), toFt(input.length)),
+    });
   };
 
   // Hand off to the Complete Calculator using the drawn room's bounding box.
@@ -737,6 +772,9 @@ export default function RoomDesigner() {
 
   return (
     <div className="space-y-6">
+    <div className="flex justify-end">
+      <SavedCalculations onLoad={handleLoadSaved} />
+    </div>
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
       {/* Canvas */}
       <Card className="overflow-hidden">
@@ -830,6 +868,8 @@ export default function RoomDesigner() {
           >
             <canvas
               ref={canvasRef}
+              role="img"
+              aria-label="Room floor-plan canvas — draw and edit the room shape and fixture layout"
               className="absolute inset-0 h-full w-full touch-none rounded-lg"
               style={{ cursor: mode === 'free' && !closed ? 'crosshair' : 'pointer' }}
               onPointerDown={onPointerDown}
@@ -1110,6 +1150,7 @@ export default function RoomDesigner() {
             result={designed.result}
             roomType={config.roomType}
             customRoomName={config.roomType === 'other' ? config.customRoomName : undefined}
+            source="designer"
           />
         </>
       )}

@@ -3,6 +3,8 @@
 
 export type SpecGuidance = {
   colorTemp: string; // e.g. "2700K – 3000K (warm white)"
+  cctMin: number; // numeric CCT range (Kelvin) for the preview swatch
+  cctMax: number;
   colorTempReason: string;
   cri: string; // e.g. "CRI 90+"
   criReason: string;
@@ -36,6 +38,8 @@ export function getSpecGuidance(roomType: string, ceilingHeightFt: number): Spec
     : cool
     ? '3500K – 4000K (neutral / cool white)'
     : '3000K (soft white)';
+  const cctMin = warm ? 2700 : cool ? 3500 : 3000;
+  const cctMax = warm ? 3000 : cool ? 4000 : 3000;
   const colorTempReason = warm
     ? 'Warm tones create a relaxing, residential atmosphere for living and resting spaces.'
     : cool
@@ -63,6 +67,8 @@ export function getSpecGuidance(roomType: string, ceilingHeightFt: number): Spec
 
   return {
     colorTemp,
+    cctMin,
+    cctMax,
     colorTempReason,
     cri,
     criReason,

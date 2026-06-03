@@ -1,4 +1,5 @@
 import { CalculationInput, CalculationResult } from './index';
+import type { DesignerState } from '@/lib/shareUrl';
 
 export type SavedCalculation = {
   id: string;
@@ -8,6 +9,8 @@ export type SavedCalculation = {
   type: 'full' | 'lumens';
   input: CalculationInput | LumensOnlyInput;
   result: CalculationResult | LumensOnlyResult;
+  // Present when saved from the Room Designer — restores the actual drawn shape.
+  designer?: DesignerState;
 };
 
 export type LumensOnlyInput = {

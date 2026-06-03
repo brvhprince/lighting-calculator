@@ -5,14 +5,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Lightbulb, Ruler } from 'lucide-react';
 import { CalculationResult } from '@/types';
 import { LightingZones } from './LightingZones';
+import { CircuitPlan } from './CircuitPlan';
 import { CostEnergyEstimator } from './CostEnergyEstimator';
 import { ProductRecommendations } from './ProductRecommendations';
 import { ShoppingList } from './ShoppingList';
+import { QuoteRequestDialog } from './QuoteRequestDialog';
+import { ROOM_TYPES } from '@/lib/roomTypes';
 
 type Props = {
   result: CalculationResult;
   roomType: string;
   customRoomName?: string;
+  source?: 'calculator' | 'designer';
   // Tool-specific visualization (e.g. the calculator's spacing grid) shown
   // beside the requirements summary. The designer omits it (it has its canvas).
   visual?: ReactNode;
@@ -20,7 +24,8 @@ type Props = {
 
 // The full analytical result stack, shared by the calculator and the designer so
 // both surface identical lumens, zones, cost, product and shopping guidance.
-export function LightingResults({ result, roomType, customRoomName, visual }: Props) {
+export function LightingResults({ result, roomType, customRoomName, source = 'calculator', visual }: Props) {
+  const roomName = customRoomName || ROOM_TYPES[roomType]?.name || 'Room';
   return (
     <div className="space-y-6">
       <div className={visual ? 'grid gap-6 md:grid-cols-2' : ''}>
@@ -93,9 +98,23 @@ export function LightingResults({ result, roomType, customRoomName, visual }: Pr
       </Card>
 
       <LightingZones roomType={roomType} totalLumens={result.totalLumensNeeded} />
+      <CircuitPlan result={result} roomType={roomType} />
       <CostEnergyEstimator result={result} />
       <ProductRecommendations roomType={roomType} ceilingHeightFt={result.ceilingHeightFt ?? 8} />
       <ShoppingList result={result} roomType={roomType} customRoomName={customRoomName} />
+
+      {/* Conversion CTA */}
+      <Card className="border-brand-bronze/40 bg-brand-bronze/5 print:hidden">
+        <CardContent className="flex flex-wrap items-center justify-between gap-4 py-5">
+          <div>
+            <p className="font-display text-lg">Bring this design to life with Pen Homes</p>
+            <p className="text-sm text-muted-foreground">
+              We design your home and its intelligence simultaneously — from sketch to seamless install.
+            </p>
+          </div>
+          <QuoteRequestDialog result={result} roomType={roomType} roomName={roomName} source={source} />
+        </CardContent>
+      </Card>
     </div>
   );
 }

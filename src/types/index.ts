@@ -15,6 +15,7 @@ export type RoomConfigValue = {
   fixtureSize: string; // '' = auto-select
   customFixtureLumens: string; // advanced
   customLumensPerSqFt: string; // advanced override
+  targetLux: string; // advanced: target illuminance in lux (overrides preset)
 };
 
 export type RoomType = {

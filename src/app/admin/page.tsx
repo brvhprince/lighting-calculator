@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import AdminConfigEditor from '@/components/AdminConfigEditor';
+import AdminLeads from '@/components/AdminLeads';
 import { AdminGate } from '@/components/AdminGate';
 
 export const metadata: Metadata = {
@@ -18,7 +19,10 @@ export default function AdminPage() {
         </p>
       </div>
       <AdminGate>
-        <AdminConfigEditor />
+        <div className="space-y-8">
+          <AdminLeads />
+          <AdminConfigEditor />
+        </div>
       </AdminGate>
     </div>
   );

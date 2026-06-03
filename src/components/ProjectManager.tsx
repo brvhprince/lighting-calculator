@@ -16,6 +16,7 @@ import {
   getProjects,
   createProject,
   deleteProject,
+  updateProject,
   addRoomToProject,
   removeRoomFromProject,
   roomFromCalculation,
@@ -35,6 +36,9 @@ import {
   Download,
   Upload,
   Building2,
+  Share2,
+  Copy,
+  Check,
   X,
 } from 'lucide-react';
 
@@ -45,6 +49,8 @@ export default function ProjectManager() {
   const [newName, setNewName] = useState('');
   const [newClient, setNewClient] = useState('');
   const [roomToAdd, setRoomToAdd] = useState<string>('');
+  const [publishing, setPublishing] = useState(false);
+  const [copied, setCopied] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const refresh = () => {
@@ -115,6 +121,74 @@ export default function ProjectManager() {
     URL.revokeObjectURL(url);
   };
 
+  const handlePublish = async () => {
+    if (!active) return;
+    setPublishing(true);
+    try {
+      const rooms = active.rooms.map((r) => {
+        const c = fixtureCostRange(r.numberOfFixtures, market);
+        return {
+          name: r.name,
+          areaDisplay: r.areaDisplay,
+          areaUnit: r.areaUnit,
+          numberOfFixtures: r.numberOfFixtures,
+          fixtureSize: r.fixtureSize,
+          totalLumens: r.totalLumens,
+          costLow: c.low,
+          costHigh: c.high,
+        };
+      });
+      const tot = projectTotals(active);
+      const res = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: active.shareCode,
+          editKey: active.editKey,
+          name: active.name,
+          client: active.client,
+          data: {
+            currency: market.code,
+            rooms,
+            totals: {
+              roomCount: tot.roomCount,
+              totalFixtures: tot.totalFixtures,
+              totalLumens: tot.totalLumens,
+              costLow: costTotals.low,
+              costHigh: costTotals.high,
+            },
+          },
+        }),
+      });
+      const d = await res.json();
+      if (res.ok && d.code) {
+        updateProject({ ...active, shareCode: d.code, editKey: d.editKey });
+        refresh();
+      } else {
+        alert(d.error || 'Could not publish the project.');
+      }
+    } catch {
+      alert('Network error while publishing.');
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  const shareUrl = active?.shareCode
+    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/r/${active.shareCode}`
+    : '';
+
+  const copyShare = async () => {
+    if (!shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      window.prompt('Copy this link:', shareUrl);
+    }
+  };
+
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -152,7 +226,7 @@ export default function ProjectManager() {
               <Input
                 id="pname"
                 value={newName}
-                placeholder="e.g., Akoto Residence"
+                placeholder="e.g., John Doe Residence"
                 onChange={(e) => setNewName(e.target.value)}
               />
             </div>
@@ -161,7 +235,7 @@ export default function ProjectManager() {
               <Input
                 id="pclient"
                 value={newClient}
-                placeholder="e.g., Mr. & Mrs. Akoto"
+                placeholder="e.g., Mr. & Mrs. Doe"
                 onChange={(e) => setNewClient(e.target.value)}
               />
             </div>
@@ -220,7 +294,17 @@ export default function ProjectManager() {
                       Created {new Date(active.createdAt).toLocaleDateString()}
                     </CardDescription>
                   </div>
-                  <div className="flex gap-2 print:hidden">
+                  <div className="flex flex-wrap gap-2 print:hidden">
+                    <Button variant="outline" size="sm" onClick={handlePublish} disabled={publishing} className="gap-1.5">
+                      <Share2 className="h-4 w-4" />
+                      {active.shareCode
+                        ? publishing
+                          ? 'Updating…'
+                          : 'Update link'
+                        : publishing
+                        ? 'Publishing…'
+                        : 'Publish'}
+                    </Button>
                     <Button variant="outline" size="sm" onClick={() => window.print()} className="gap-1.5">
                       <Printer className="h-4 w-4" /> Print
                     </Button>
@@ -239,6 +323,25 @@ export default function ProjectManager() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
+                {shareUrl && (
+                  <div className="flex flex-wrap items-center gap-2 rounded-lg border border-brand-bronze/40 bg-brand-bronze/5 p-3 print:hidden">
+                    <Share2 className="h-4 w-4 shrink-0 text-brand-bronze" />
+                    <span className="text-sm">Public report:</span>
+                    <a
+                      href={shareUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="break-all text-sm font-medium text-brand-bronze underline"
+                    >
+                      {shareUrl}
+                    </a>
+                    <Button variant="ghost" size="sm" onClick={copyShare} className="ml-auto gap-1.5">
+                      {copied ? <Check className="h-4 w-4 text-brand-sage" /> : <Copy className="h-4 w-4" />}
+                      {copied ? 'Copied' : 'Copy'}
+                    </Button>
+                  </div>
+                )}
+
                 {/* Add room */}
                 <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-muted/30 p-4 print:hidden">
                   <div className="min-w-[220px] flex-1 space-y-1.5">

@@ -1,0 +1,274 @@
+import {
+  Document,
+  Page,
+  Text,
+  View,
+  StyleSheet,
+  pdf,
+} from '@react-pdf/renderer';
+import { CalculationResult } from '@/types';
+import { Market, formatMoney } from '@/config/markets';
+import { LightLayer } from '@/lib/lightingZones';
+import { SpecGuidance, PenlabsProduct } from '@/lib/productRecommendations';
+import { CostEstimate } from '@/lib/costEstimator';
+
+export type LightingReportData = {
+  roomName: string;
+  date: string;
+  result: CalculationResult;
+  market: Market;
+  layers: LightLayer[];
+  spec: SpecGuidance;
+  products: PenlabsProduct[];
+  cost: CostEstimate;
+  fixtureRange: { low: number; high: number };
+};
+
+// Pen Homes palette
+const C = {
+  basalt: '#2C332E',
+  bone: '#F5F2ED',
+  linen: '#F2EFE9',
+  bronze: '#A68966',
+  sage: '#8A9682',
+  text: '#2C332E',
+  muted: '#6B6F6A',
+  border: '#DAD5CC',
+};
+
+const s = StyleSheet.create({
+  page: { backgroundColor: '#FFFFFF', color: C.text, fontSize: 10, fontFamily: 'Helvetica', paddingBottom: 56 },
+  header: { backgroundColor: C.basalt, color: C.bone, padding: 28, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  brandRow: { flexDirection: 'row', alignItems: 'center' },
+  mark: { width: 30, height: 30, borderRadius: 6, backgroundColor: C.bronze, color: C.bone, fontFamily: 'Times-Bold', fontSize: 18, textAlign: 'center', paddingTop: 5, marginRight: 10 },
+  brandName: { fontFamily: 'Times-Roman', fontSize: 16, color: C.bone },
+  brandSub: { fontSize: 7, letterSpacing: 2, color: C.sage, textTransform: 'uppercase', marginTop: 2 },
+  metaLabel: { fontSize: 7, letterSpacing: 1.5, color: C.sage, textTransform: 'uppercase', textAlign: 'right' },
+  metaValue: { fontSize: 11, color: C.bone, textAlign: 'right', marginTop: 2 },
+  body: { padding: 28 },
+  h2: { fontFamily: 'Times-Roman', fontSize: 13, color: C.basalt, marginBottom: 8, marginTop: 18 },
+  kicker: { fontSize: 7, letterSpacing: 2, color: C.bronze, textTransform: 'uppercase' },
+  statRow: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -4 },
+  stat: { width: '25%', padding: 4 },
+  statBox: { borderWidth: 1, borderColor: C.border, borderRadius: 6, padding: 10, backgroundColor: C.linen, height: 58 },
+  statLabel: { fontSize: 7, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  statValue: { fontFamily: 'Times-Roman', fontSize: 15, color: C.basalt, marginTop: 4 },
+  statUnit: { fontSize: 8, color: C.muted },
+  row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: C.border },
+  rowLabel: { color: C.muted },
+  rowValue: { fontFamily: 'Helvetica-Bold' },
+  twoCol: { flexDirection: 'row', marginHorizontal: -8 },
+  col: { flex: 1, paddingHorizontal: 8 },
+  card: { borderWidth: 1, borderColor: C.border, borderRadius: 6, padding: 10, marginBottom: 8 },
+  cardTitle: { fontFamily: 'Helvetica-Bold', fontSize: 10, marginBottom: 2 },
+  small: { fontSize: 8, color: C.muted, marginTop: 2 },
+  zoneBarTrack: { flexDirection: 'row', height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 8 },
+  bullet: { flexDirection: 'row', marginBottom: 3 },
+  bulletDot: { color: C.bronze, marginRight: 5 },
+  bulletText: { flex: 1, fontSize: 9 },
+  layoutBox: { borderWidth: 1, borderStyle: 'dashed', borderColor: C.border, borderRadius: 6, padding: 12, backgroundColor: C.linen },
+  layoutRow: { flexDirection: 'row', justifyContent: 'space-around', marginVertical: 4 },
+  dot: { width: 9, height: 9, borderRadius: 5, backgroundColor: C.bronze },
+  footer: { position: 'absolute', bottom: 20, left: 28, right: 28, borderTopWidth: 1, borderTopColor: C.border, paddingTop: 8, flexDirection: 'row', justifyContent: 'space-between' },
+  footerText: { fontSize: 7, color: C.muted },
+});
+
+const ZONE_COLORS: Record<LightLayer['key'], string> = {
+  ambient: C.basalt,
+  task: C.bronze,
+  accent: C.sage,
+};
+
+function Stat({ label, value, unit }: { label: string; value: string; unit?: string }) {
+  return (
+    <View style={s.stat}>
+      <View style={s.statBox}>
+        <Text style={s.statLabel}>{label}</Text>
+        <Text style={s.statValue}>{value}</Text>
+        {unit ? <Text style={s.statUnit}>{unit}</Text> : null}
+      </View>
+    </View>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={s.row}>
+      <Text style={s.rowLabel}>{label}</Text>
+      <Text style={s.rowValue}>{value}</Text>
+    </View>
+  );
+}
+
+function LightingReport(d: LightingReportData) {
+  const { result, market } = d;
+  const rows = Math.min(result.spacing.layout.rows, 8);
+  const cols = Math.min(result.spacing.layout.columns, 12);
+
+  return (
+    <Document
+      title={`Penlabs Lighting — ${d.roomName}`}
+      author="Pen Homes"
+      subject="Lighting design report"
+    >
+      <Page size="A4" style={s.page}>
+        {/* Header */}
+        <View style={s.header}>
+          <View style={s.brandRow}>
+            <Text style={s.mark}>P</Text>
+            <View>
+              <Text style={s.brandName}>Penlabs Lighting</Text>
+              <Text style={s.brandSub}>by Pen Homes</Text>
+            </View>
+          </View>
+          <View>
+            <Text style={s.metaLabel}>Lighting Report</Text>
+            <Text style={s.metaValue}>{d.roomName}</Text>
+            <Text style={[s.metaLabel, { marginTop: 4 }]}>{d.date}</Text>
+          </View>
+        </View>
+
+        <View style={s.body}>
+          {/* Summary */}
+          <Text style={s.kicker}>Summary</Text>
+          <Text style={s.h2}>Lighting requirements</Text>
+          <View style={s.statRow}>
+            <Stat label="Floor area" value={result.area.toFixed(1)} unit={result.areaUnit} />
+            <Stat label="Total lumens" value={result.totalLumensNeeded.toLocaleString()} unit="lm" />
+            <Stat label="Fixtures" value={String(result.numberOfFixtures)} unit={result.fixtureSize} />
+            <Stat label="Per fixture" value={String(result.lumensPerFixture)} unit="lm" />
+          </View>
+
+          <View style={s.twoCol}>
+            <View style={s.col}>
+              <View style={{ marginTop: 8 }}>
+                <Row label="Lumens per sq ft" value={String(result.lumensPerSqFt)} />
+                <Row label="Ceiling height" value={`${(result.ceilingHeightFt ?? 8).toFixed(1)} ft`} />
+                {result.ceilingFactor != null && result.ceilingFactor !== 1 ? (
+                  <Row
+                    label="Ceiling adjustment"
+                    value={`${result.ceilingFactor > 1 ? '+' : ''}${Math.round((result.ceilingFactor - 1) * 100)}%`}
+                  />
+                ) : null}
+                {result.naturalLightFactor != null && result.naturalLightFactor !== 1 ? (
+                  <Row
+                    label="Daylight reduction"
+                    value={`-${Math.round((1 - result.naturalLightFactor) * 100)}%`}
+                  />
+                ) : null}
+              </View>
+            </View>
+            <View style={s.col}>
+              <Text style={[s.small, { marginBottom: 4 }]}>
+                Suggested layout — {result.spacing.layout.rows} × {result.spacing.layout.columns},
+                {' '}{result.spacing.fromWall} {result.spacing.unit} from walls
+              </Text>
+              <View style={s.layoutBox}>
+                {Array.from({ length: rows }).map((_, r) => (
+                  <View key={r} style={s.layoutRow}>
+                    {Array.from({ length: cols }).map((_, c) => (
+                      <View key={c} style={s.dot} />
+                    ))}
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+
+          {/* Layered plan */}
+          <Text style={s.h2}>Layered lighting plan</Text>
+          <View style={s.zoneBarTrack}>
+            {d.layers.map((l) => (
+              <View key={l.key} style={{ width: `${l.percent}%`, backgroundColor: ZONE_COLORS[l.key] }} />
+            ))}
+          </View>
+          {d.layers.map((l) => (
+            <View key={l.key} style={s.row}>
+              <Text style={s.rowLabel}>
+                {l.name} — {l.examples}
+              </Text>
+              <Text style={s.rowValue}>
+                {l.lumens.toLocaleString()} lm · {l.percent}%
+              </Text>
+            </View>
+          ))}
+
+          {/* Cost & energy */}
+          <Text style={s.h2}>Cost &amp; energy ({market.code})</Text>
+          <View style={s.twoCol}>
+            <View style={s.col}>
+              <Row label="Material (fixtures + hardware)" value={`${formatMoney(d.fixtureRange.low, market)} – ${formatMoney(d.fixtureRange.high, market)}`} />
+              <Row label="LED running cost" value={`${formatMoney(d.cost.annualEnergyCostLed, market)}/yr`} />
+              <Row label="vs. incandescent" value={`${formatMoney(d.cost.annualEnergyCostIncandescent, market)}/yr`} />
+            </View>
+            <View style={s.col}>
+              <Row label="LED saves" value={`${formatMoney(d.cost.annualSavings, market)}/yr`} />
+              <Row label="Over 10 years" value={formatMoney(d.cost.tenYearSavings, market)} />
+              <Row label="CO₂ avoided" value={`${d.cost.annualCo2SavedKg} kg/yr`} />
+            </View>
+          </View>
+
+          {/* Spec guidance */}
+          <Text style={s.h2}>Recommended specification</Text>
+          <View style={s.twoCol}>
+            <View style={s.col}>
+              <View style={s.card}>
+                <Text style={s.cardTitle}>Colour temperature</Text>
+                <Text>{d.spec.colorTemp}</Text>
+                <Text style={s.small}>{d.spec.colorTempReason}</Text>
+              </View>
+            </View>
+            <View style={s.col}>
+              <View style={s.card}>
+                <Text style={s.cardTitle}>Colour rendering</Text>
+                <Text>{d.spec.cri}</Text>
+                <Text style={s.small}>{d.spec.criReason}</Text>
+              </View>
+            </View>
+            <View style={s.col}>
+              <View style={s.card}>
+                <Text style={s.cardTitle}>Beam angle</Text>
+                <Text>{d.spec.beamAngle}</Text>
+                <Text style={s.small}>{d.spec.beamReason}</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Penlabs products */}
+          <Text style={s.h2}>Curated Penlabs fixtures</Text>
+          <View style={s.twoCol}>
+            {d.products.map((p) => (
+              <View key={p.name} style={s.col}>
+                <View style={s.card}>
+                  <Text style={s.cardTitle}>{p.name}</Text>
+                  <Text style={s.small}>{p.tagline}</Text>
+                  <Text style={{ marginTop: 4 }}>{p.lumens} · {p.watts}</Text>
+                  <Text>{p.colorTemp} · {p.cri}</Text>
+                  <Text style={s.small}>{p.smart} · {p.finish}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+
+          {/* Recommendations */}
+          <Text style={s.h2}>Notes &amp; recommendations</Text>
+          {result.recommendations.map((rec, i) => (
+            <View key={i} style={s.bullet}>
+              <Text style={s.bulletDot}>•</Text>
+              <Text style={s.bulletText}>{rec}</Text>
+            </View>
+          ))}
+        </View>
+
+        <View style={s.footer} fixed>
+          <Text style={s.footerText}>Penlabs Lighting · a Pen Homes company — intentional, invisible technology.</Text>
+          <Text style={s.footerText} render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} />
+        </View>
+      </Page>
+    </Document>
+  );
+}
+
+export async function buildLightingReportBlob(data: LightingReportData): Promise<Blob> {
+  return pdf(<LightingReport {...data} />).toBlob();
+}

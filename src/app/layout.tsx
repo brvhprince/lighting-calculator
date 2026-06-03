@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { CurrencyProvider } from "@/context/CurrencyProvider";
 import { CurrencySelector } from "@/components/CurrencySelector";
+import { SITE_URL } from "@/lib/site";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -20,7 +21,7 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://lighting.penhomes.com"),
+  metadataBase: new URL(SITE_URL),
   title: {
     default: "Penlabs Lighting Calculator — Pen Homes",
     template: "%s",

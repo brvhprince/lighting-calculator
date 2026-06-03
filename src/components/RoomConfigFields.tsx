@@ -22,6 +22,7 @@ export function defaultRoomConfig(overrides: Partial<RoomConfigValue> = {}): Roo
     fixtureSize: '',
     customFixtureLumens: '',
     customLumensPerSqFt: '',
+    targetLux: '',
     ...overrides,
   };
 }
@@ -201,6 +202,22 @@ export function RoomConfigFields({
       {showAdvanced && (
         <div className="space-y-4 rounded-lg border bg-muted/50 p-4">
           <h4 className="text-sm font-semibold">Professional Overrides</h4>
+          <div className="space-y-2">
+            <Label htmlFor={id('lux')}>Target Illuminance (lux, optional)</Label>
+            <Input
+              id={id('lux')}
+              type="number"
+              placeholder="e.g., 300"
+              value={value.targetLux}
+              onChange={(e) => onChange({ targetLux: e.target.value })}
+            />
+            <p className="text-xs text-muted-foreground">
+              IES targets — living ≈100–150, bedroom ≈150, kitchen/bath ≈300–500, office ≈500.
+              {value.targetLux && parseFloat(value.targetLux) > 0
+                ? ` ≈ ${(parseFloat(value.targetLux) / 10.7639).toFixed(1)} lm/ft². Overrides the preset.`
+                : ' Overrides the room preset when set.'}
+            </p>
+          </div>
           <div className="space-y-2">
             <Label htmlFor={id('lumens-override')}>Custom Lumens per Square Foot (optional)</Label>
             <Input

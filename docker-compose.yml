@@ -1,8 +1,13 @@
 # Pen Homes — Penlabs Lighting Calculator
 #
-# Calculations persist client-side (browser localStorage), so no database is
-# required to run the app. If a future feature needs cloud sync / user accounts,
-# uncomment the `db` service and the `web.depends_on` / `web.environment` lines.
+# For self-hosting (production runs on Vercel + Prisma Postgres). The calculators
+# and designer work fully client-side; only the saved pricing/market config needs
+# the database. The client connects to Prisma Postgres via Accelerate, so set
+# DATABASE_URL to your prisma+postgres:// URL.
+#
+# Provide secrets via your shell or a root `.env` file (compose substitutes them):
+#   DATABASE_URL=...   AUTH_SECRET=...   ADMIN_PASSCODE=...
+# Omit DATABASE_URL to run on the markets.ts defaults (admin saves disabled).
 
 services:
   web:
@@ -17,22 +22,10 @@ services:
     environment:
       - NODE_ENV=production
       - NEXT_TELEMETRY_DISABLED=1
-      # - DATABASE_URL=postgres://pen:pen@db:5432/penlighting
-    # depends_on:
-    #   - db
+      - DATABASE_URL=${DATABASE_URL:-}
+      - AUTH_SECRET=${AUTH_SECRET:-}
+      - ADMIN_PASSCODE=${ADMIN_PASSCODE:-}
 
-  # db:
-  #   image: postgres:16-alpine
-  #   container_name: penlabs-db
-  #   restart: unless-stopped
-  #   environment:
-  #     - POSTGRES_USER=pen
-  #     - POSTGRES_PASSWORD=pen
-  #     - POSTGRES_DB=penlighting
-  #   volumes:
-  #     - pen-db-data:/var/lib/postgresql/data
-  #   ports:
-  #     - "5432:5432"
-
-# volumes:
-#   pen-db-data:
+# To run a self-managed Postgres here instead of Prisma Postgres, you must also
+# switch src/lib/prisma.ts to a driver adapter (@prisma/adapter-pg) with a direct
+# postgres:// URL — Accelerate's prisma+postgres:// URL can't target this service.

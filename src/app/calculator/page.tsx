@@ -1,4 +1,11 @@
+import type { Metadata } from 'next';
 import FullLightingCalculator from '@/components/FullLightingCalculator';
+
+export const metadata: Metadata = {
+  title: 'Complete Lighting Calculator — Penlabs',
+  description:
+    'Calculate fixtures, spacing, layered zones, product specs, cost and energy for any room — ceiling-height and daylight aware.',
+};
 
 export default function CalculatorPage() {
   return (

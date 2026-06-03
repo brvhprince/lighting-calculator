@@ -17,6 +17,9 @@ export type Project = {
   client?: string;
   createdAt: number;
   rooms: ProjectRoom[];
+  // Set once published to the cloud (read-only share link at /r/<shareCode>).
+  shareCode?: string;
+  editKey?: string;
 };
 
 export type ProjectTotals = {

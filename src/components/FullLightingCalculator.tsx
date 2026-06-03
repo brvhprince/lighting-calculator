@@ -12,6 +12,7 @@ import { ROOM_TYPES } from '@/lib/roomTypes';
 import { ROOM_PRESETS, presetDimensions, RoomPreset } from '@/lib/roomPresets';
 import { calculateLighting, dimToFeet } from '@/lib/calculator';
 import { rectangleShape } from '@/lib/geometry';
+import { resolveCustomLumensPerSqFt } from '@/lib/roomConfig';
 import { CalculationInput, CalculationResult, UnitSystem, RoomConfigValue } from '@/types';
 import { SavedCalculations } from './SavedCalculations';
 import { SavedCalculation } from '@/types/saved-calculations';
@@ -50,12 +51,7 @@ export default function FullLightingCalculator() {
     slopedCeiling: config.sloped || undefined,
     ceilingPeakHeight: config.sloped && config.ceilingPeakFt ? ftToUnit(config.ceilingPeakFt) : undefined,
     naturalLight: config.naturalLight !== 'none' ? config.naturalLight : undefined,
-    customLumensPerSqFt:
-      config.roomType === 'other' && config.customRoomLumens
-        ? parseFloat(config.customRoomLumens)
-        : config.customLumensPerSqFt
-        ? parseFloat(config.customLumensPerSqFt)
-        : undefined,
+    customLumensPerSqFt: resolveCustomLumensPerSqFt(config),
     fixtureSize: config.fixtureSize || undefined,
     customFixtureLumens: config.customFixtureLumens ? parseFloat(config.customFixtureLumens) : undefined,
   }), [length, width, unitSystem, config, isExpert, ftToUnit]);
