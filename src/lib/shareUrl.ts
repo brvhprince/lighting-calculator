@@ -1,4 +1,5 @@
-import { CalculationInput } from '@/types';
+import { CalculationInput, RoomConfigValue } from '@/types';
+import { Point } from '@/lib/geometry';
 
 // Encode/decode a calculation into a URL-safe string so a configuration can be
 // shared via a link (no server required).
@@ -33,4 +34,33 @@ export function decodeInput(encoded: string): CalculationInput | null {
 export function buildShareUrl(input: CalculationInput): string {
   const base = typeof window !== 'undefined' ? `${window.location.origin}/calculator` : '/calculator';
   return `${base}?c=${encodeInput(input)}`;
+}
+
+// ── Designer state (polygon + design params), used for the two-way handoff ──
+
+export type DesignerState = {
+  unit: 'imperial' | 'metric';
+  config: RoomConfigValue;
+  points: Point[]; // feet
+};
+
+export function encodeDesigner(state: DesignerState): string {
+  return toBase64Url(JSON.stringify(state));
+}
+
+export function decodeDesigner(encoded: string): DesignerState | null {
+  try {
+    const parsed = JSON.parse(fromBase64Url(encoded));
+    if (Array.isArray(parsed?.points) && parsed.points.length >= 3 && parsed?.config?.roomType) {
+      return parsed as DesignerState;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function buildDesignerUrl(state: DesignerState): string {
+  const base = typeof window !== 'undefined' ? `${window.location.origin}/designer` : '/designer';
+  return `${base}?d=${encodeDesigner(state)}`;
 }

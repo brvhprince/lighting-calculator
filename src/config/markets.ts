@@ -68,6 +68,55 @@ export function getMarket(code: CurrencyCode): Market {
   return MARKETS[code] ?? MARKETS[DEFAULT_CURRENCY];
 }
 
+// Runtime overrides (e.g. edited in /admin) merged over the built-in defaults.
+export type MarketOverrides = Partial<Record<CurrencyCode, Partial<Market>>>;
+
+export function mergeMarkets(
+  base: Record<CurrencyCode, Market>,
+  overrides?: MarketOverrides
+): Record<CurrencyCode, Market> {
+  if (!overrides) return base;
+  const out = {} as Record<CurrencyCode, Market>;
+  (Object.keys(base) as CurrencyCode[]).forEach((code) => {
+    // `code` is kept from the base so it can never be corrupted by an edit.
+    out[code] = { ...base[code], ...(overrides[code] || {}), code };
+  });
+  return out;
+}
+
+const NUMERIC_FIELDS: (keyof Market)[] = [
+  'fixtureUnitPrice',
+  'hardwareCost',
+  'installCostPerFixture',
+  'electricityRate',
+  'fixturePriceLow',
+  'fixturePriceHigh',
+  'hardwareLow',
+  'hardwareHigh',
+];
+
+// Validate a parsed markets object before accepting it as overrides.
+// Returns an error string, or null when valid.
+export function validateMarkets(value: unknown): string | null {
+  if (typeof value !== 'object' || value === null) return 'Top level must be an object keyed by currency code.';
+  const obj = value as Record<string, unknown>;
+  const codes = Object.keys(MARKETS);
+  for (const key of Object.keys(obj)) {
+    if (!codes.includes(key)) return `Unknown currency code "${key}". Allowed: ${codes.join(', ')}.`;
+    const m = obj[key] as Record<string, unknown>;
+    if (typeof m !== 'object' || m === null) return `"${key}" must be an object.`;
+    for (const f of NUMERIC_FIELDS) {
+      if (!(f in m)) return `"${key}" is missing "${f}".`;
+      if (typeof m[f] !== 'number' || !isFinite(m[f] as number) || (m[f] as number) < 0)
+        return `"${key}.${String(f)}" must be a non-negative number.`;
+    }
+    if (typeof m.symbol !== 'string') return `"${key}.symbol" must be a string.`;
+    if (typeof m.locale !== 'string') return `"${key}.locale" must be a string.`;
+    if (typeof m.label !== 'string') return `"${key}.label" must be a string.`;
+  }
+  return null;
+}
+
 // Format a numeric amount in a market's currency (e.g. "$1,250" / "GH₵18,400").
 export function formatMoney(value: number, market: Market): string {
   try {

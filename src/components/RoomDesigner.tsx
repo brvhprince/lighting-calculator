@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,10 +22,17 @@ import {
   rectangleShape,
   lShape,
   tShape,
+  boundingBox,
+  FixturePlacement,
 } from '@/lib/geometry';
 import { ROOM_TYPES } from '@/lib/roomTypes';
-import { FIXTURE_SIZES } from '@/lib/fixtureTypes';
-import { computeCeilingFactor } from '@/lib/calculator';
+import { buildLightingResult } from '@/lib/calculator';
+import { CalculationInput, CalculationResult, UnitSystem, RoomConfigValue } from '@/types';
+import { saveCalculation, generateCalculationId } from '@/lib/savedCalculations';
+import { buildShareUrl, decodeDesigner } from '@/lib/shareUrl';
+import { LightingResults } from './LightingResults';
+import { RoomConfigFields, defaultRoomConfig } from './RoomConfigFields';
+import { PDFExport } from './PDFExport';
 import {
   Pentagon,
   Square,
@@ -39,6 +47,8 @@ import {
   ArrowRightToLine,
   MoveHorizontal,
   Grid2x2,
+  Save,
+  Calculator,
   X,
 } from 'lucide-react';
 
@@ -54,6 +64,7 @@ const CANVAS_W = 720;
 const CANVAS_H = 520;
 
 export default function RoomDesigner() {
+  const router = useRouter();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -70,9 +81,11 @@ export default function RoomDesigner() {
   const [shapeH, setShapeH] = useState(12);
 
   // Lighting parameters
-  const [roomType, setRoomType] = useState('livingRoom');
-  const [ceiling, setCeiling] = useState(9); // feet
-  const [fixtureKey, setFixtureKey] = useState('4inch');
+  const [config, setConfig] = useState<RoomConfigValue>(() =>
+    defaultRoomConfig({ roomType: 'livingRoom', ceilingFt: 9, fixtureSize: '4inch' })
+  );
+  const updateConfig = (patch: Partial<RoomConfigValue>) => setConfig((c) => ({ ...c, ...patch }));
+  const [saved, setSaved] = useState(false);
   const [showHeatmap, setShowHeatmap] = useState(true);
   const [scaleRatio, setScaleRatio] = useState<'fit' | '20' | '50' | '100'>('fit');
   const [showDims, setShowDims] = useState(false);
@@ -174,7 +187,22 @@ export default function RoomDesigner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shapeW, shapeH]);
 
+  // On mount: load a handed-off room from the Calculator (?d=…) if present.
   useEffect(() => {
+    const enc = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('d') : null;
+    if (enc) {
+      const s = decodeDesigner(enc);
+      if (s) {
+        setUnit(s.unit);
+        setMode('free');
+        setConfig(s.config);
+        setPoints(s.points);
+        setClosed(true);
+        setScaleRatio('fit');
+        fitView(s.points);
+        return;
+      }
+    }
     fitView(points);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -196,24 +224,90 @@ export default function RoomDesigner() {
   const areaSqFt = useMemo(() => (closed ? polygonArea(points) : 0), [points, closed]);
   const perimeterFt = useMemo(() => (closed ? polygonPerimeter(points) : 0), [points, closed]);
 
-  const result = useMemo(() => {
+  // Build the SAME CalculationResult the calculator produces, from the drawn
+  // polygon's area — so the designer can render the full LightingResults stack.
+  const designed = useMemo(() => {
     if (!closed || areaSqFt <= 0) return null;
-    const lps = ROOM_TYPES[roomType]?.lumensPerSqFt.recommended ?? 25;
-    const cf = computeCeilingFactor(ceiling);
-    const totalLumens = Math.ceil(areaSqFt * lps * cf);
-    const perFixture = FIXTURE_SIZES[fixtureKey]?.typicalLumens.recommended ?? 600;
-    const targetCount = Math.max(1, Math.ceil(totalLumens / perFixture));
-    const placement = placeFixturesInPolygon(points, targetCount, { minWallMarginFt: 1.5 });
+    const ceilingFt =
+      config.sloped && config.ceilingPeakFt > 0
+        ? (config.ceilingFt + config.ceilingPeakFt) / 2
+        : config.ceilingFt;
+    const customLps =
+      config.roomType === 'other' && config.customRoomLumens
+        ? parseFloat(config.customRoomLumens)
+        : config.customLumensPerSqFt
+        ? parseFloat(config.customLumensPerSqFt)
+        : undefined;
+    let placement: FixturePlacement = { points: [], spacingFt: 0 };
+    const result = buildLightingResult({
+      areaInSqFt: areaSqFt,
+      areaDisplay: unit === 'metric' ? areaSqFt * SQFT_TO_SQM : areaSqFt,
+      unitSystem: unit as UnitSystem,
+      roomType: config.roomType,
+      customLumensPerSqFt: customLps,
+      ceilingHeightFt: ceilingFt || 8,
+      naturalLight: config.naturalLight !== 'none' ? config.naturalLight : undefined,
+      fixtureSize: config.fixtureSize || undefined,
+      customFixtureLumens: config.customFixtureLumens ? parseFloat(config.customFixtureLumens) : undefined,
+      makeSpacing: (count) => {
+        placement = placeFixturesInPolygon(points, count, { minWallMarginFt: 1.5 });
+        return polygonSpacing(points, placement.spacingFt, unit);
+      },
+    });
+    return { result, fixtures: placement.points, spacingFt: placement.spacingFt };
+  }, [closed, areaSqFt, config, points, unit]);
+
+  const result = designed; // canvas drawing reads fixtures/spacing from here
+
+  // Build a CalculationInput from the drawn room's bounding box + shared config.
+  const buildInputFromDesign = (): CalculationInput => {
+    const bb = boundingBox(points);
+    const toLen = (ft: number) => (unit === 'metric' ? ft * FT_TO_M : ft);
     return {
-      lumensPerSqFt: lps,
-      ceilingFactor: cf,
-      totalLumens,
-      perFixture,
-      targetCount,
-      fixtures: placement.points,
-      spacingFt: placement.spacingFt,
+      length: toLen(bb.maxY - bb.minY),
+      width: toLen(bb.maxX - bb.minX),
+      unitSystem: unit as UnitSystem,
+      roomType: config.roomType,
+      isExpert: !!(config.customLumensPerSqFt || config.customFixtureLumens),
+      ceilingHeight: toLen(config.ceilingFt),
+      slopedCeiling: config.sloped || undefined,
+      ceilingPeakHeight: config.sloped && config.ceilingPeakFt ? toLen(config.ceilingPeakFt) : undefined,
+      naturalLight: config.naturalLight !== 'none' ? config.naturalLight : undefined,
+      fixtureSize: config.fixtureSize || undefined,
+      customFixtureLumens: config.customFixtureLumens ? parseFloat(config.customFixtureLumens) : undefined,
+      customLumensPerSqFt:
+        config.roomType === 'other' && config.customRoomLumens
+          ? parseFloat(config.customRoomLumens)
+          : config.customLumensPerSqFt
+          ? parseFloat(config.customLumensPerSqFt)
+          : undefined,
     };
-  }, [closed, areaSqFt, roomType, ceiling, fixtureKey, points]);
+  };
+
+  // Save the drawn room to the shared library so it can be added to a Project.
+  const handleSave = () => {
+    if (!designed) return;
+    const roomName =
+      config.roomType === 'other' && config.customRoomName
+        ? config.customRoomName
+        : ROOM_TYPES[config.roomType]?.name || 'Room';
+    saveCalculation({
+      id: generateCalculationId(),
+      name: `${roomName} (drawn) · ${designed.result.area.toFixed(0)} ${designed.result.areaUnit}`,
+      timestamp: Date.now(),
+      type: 'full',
+      input: buildInputFromDesign(),
+      result: designed.result,
+    });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  // Hand off to the Complete Calculator using the drawn room's bounding box.
+  const sendToCalculator = () => {
+    if (!designed) return;
+    router.push(buildShareUrl(buildInputFromDesign()));
+  };
 
   // ---- Rendering ----------------------------------------------------------
   const draw = useCallback(() => {
@@ -642,6 +736,7 @@ export default function RoomDesigner() {
   const fromDim = (v: number) => (unit === 'metric' ? v / FT_TO_M : v);
 
   return (
+    <div className="space-y-6">
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
       {/* Canvas */}
       <Card className="overflow-hidden">
@@ -924,48 +1019,13 @@ export default function RoomDesigner() {
               </div>
             )}
 
-            <div className="space-y-1.5">
-              <Label htmlFor="d-room">Room Type</Label>
-              <Select value={roomType} onValueChange={setRoomType}>
-                <SelectTrigger id="d-room">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(ROOM_TYPES).map(([key, room]) => (
-                    <SelectItem key={key} value={key}>
-                      {room.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="d-ceil">Ceiling {dimLabel}</Label>
-                <Input
-                  id="d-ceil"
-                  type="number"
-                  value={toDim(ceiling)}
-                  onChange={(e) => setCeiling(Math.max(6, fromDim(parseFloat(e.target.value) || 8)))}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="d-fix">Fixture</Label>
-                <Select value={fixtureKey} onValueChange={setFixtureKey}>
-                  <SelectTrigger id="d-fix">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(FIXTURE_SIZES).map(([key, f]) => (
-                      <SelectItem key={key} value={key}>
-                        {f.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+            <RoomConfigFields
+              value={config}
+              onChange={updateConfig}
+              unitSystem={unit as UnitSystem}
+              showAdvanced
+              idPrefix="d"
+            />
           </CardContent>
         </Card>
 
@@ -977,7 +1037,7 @@ export default function RoomDesigner() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {result ? (
+            {designed ? (
               <>
                 <Metric label="Floor area">
                   {(unit === 'metric' ? areaSqFt * SQFT_TO_SQM : areaSqFt).toFixed(1)} {areaUnit}
@@ -985,27 +1045,32 @@ export default function RoomDesigner() {
                 <Metric label="Perimeter">
                   {toDisplayLen(perimeterFt).toFixed(1)} {unitLabel}
                 </Metric>
-                <Metric label="Total lumens">{result.totalLumens.toLocaleString()}</Metric>
+                <Metric label="Total lumens">
+                  {designed.result.totalLumensNeeded.toLocaleString()}
+                </Metric>
                 <Metric label="Fixtures placed">
-                  {result.fixtures.length}
-                  {result.fixtures.length !== result.targetCount && (
-                    <span className="text-xs text-muted-foreground"> (target {result.targetCount})</span>
+                  {designed.fixtures.length}
+                  {designed.fixtures.length !== designed.result.numberOfFixtures && (
+                    <span className="text-xs text-muted-foreground">
+                      {' '}
+                      (target {designed.result.numberOfFixtures})
+                    </span>
                   )}
                 </Metric>
                 <Metric label="Avg. spacing">
-                  {toDisplayLen(result.spacingFt).toFixed(1)} {unitLabel}
+                  {toDisplayLen(designed.spacingFt).toFixed(1)} {unitLabel}
                 </Metric>
-                {result.ceilingFactor !== 1 && (
+                {designed.result.ceilingFactor !== 1 && (
                   <Metric label="Ceiling adjustment">
                     <span className="text-brand-bronze">
-                      {result.ceilingFactor > 1 ? '+' : ''}
-                      {Math.round((result.ceilingFactor - 1) * 100)}%
+                      {designed.result.ceilingFactor > 1 ? '+' : ''}
+                      {Math.round((designed.result.ceilingFactor - 1) * 100)}%
                     </span>
                   </Metric>
                 )}
                 <p className="pt-1 text-xs text-muted-foreground">
-                  {result.fixtures.length}× {FIXTURE_SIZES[fixtureKey]?.name} fixtures at ~
-                  {result.perFixture} lumens each, distributed across your floor plan.
+                  {designed.fixtures.length}× {designed.result.fixtureSize} fixtures at ~
+                  {designed.result.lumensPerFixture} lumens each, across your floor plan.
                 </p>
               </>
             ) : (
@@ -1016,6 +1081,38 @@ export default function RoomDesigner() {
           </CardContent>
         </Card>
       </div>
+    </div>
+
+      {/* Full shared analysis — identical to the Complete Calculator */}
+      {designed && (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">
+              Same lumen, zone, cost and product analysis as the Complete Calculator — from your drawn plan.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={sendToCalculator} variant="outline" className="gap-2">
+                <Calculator className="h-4 w-4" />
+                Send to Calculator
+              </Button>
+              <PDFExport
+                result={designed.result}
+                roomType={config.roomType}
+                customRoomName={config.roomType === 'other' ? config.customRoomName : undefined}
+              />
+              <Button onClick={handleSave} className="gap-2">
+                <Save className="h-4 w-4" />
+                {saved ? 'Saved to library' : 'Save to library'}
+              </Button>
+            </div>
+          </div>
+          <LightingResults
+            result={designed.result}
+            roomType={config.roomType}
+            customRoomName={config.roomType === 'other' ? config.customRoomName : undefined}
+          />
+        </>
+      )}
     </div>
   );
 }
@@ -1031,6 +1128,26 @@ function Metric({ label, children }: { label: string; children: React.ReactNode 
 
 function snap(v: number): number {
   return Math.round(v / SNAP_FT) * SNAP_FT;
+}
+
+// Approximate a CalculationResult spacing object from a polygon placement, so the
+// drawn-room result is shape-compatible with the rectangular calculator's.
+function polygonSpacing(
+  points: Point[],
+  spacingFt: number,
+  unit: 'imperial' | 'metric'
+): CalculationResult['spacing'] {
+  const bb = boundingBox(points);
+  const s = spacingFt || 1;
+  const cols = Math.max(1, Math.round((bb.maxX - bb.minX) / s));
+  const rows = Math.max(1, Math.round((bb.maxY - bb.minY) / s));
+  const toUnit = (ft: number) => (unit === 'metric' ? Math.round(ft * 304.8) : Math.round(ft * 12));
+  return {
+    betweenFixtures: toUnit(s),
+    fromWall: toUnit(1.5),
+    unit: unit === 'metric' ? 'mm' : 'inches',
+    layout: { rows, columns: cols, rowSpacing: toUnit(s), columnSpacing: toUnit(s) },
+  };
 }
 
 // Edge orientation: 'h' (horizontal) when it runs more left-right than up-down.

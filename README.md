@@ -18,6 +18,17 @@ Pen Homes standard.
 | `/designer` | **Room Designer** | Draw rectangular, L-, T- or freeform rooms **to scale** and auto-place fixtures |
 | `/project` | **Projects** | Group rooms into a whole-home project with cost rollup + exportable report |
 | `/lumens-calculator` | **Lumens Only** | Fast, room-aware total-lumens estimate |
+| `/admin` | **Configuration** | Edit prices, electricity rates & currency values (JSON), no code changes |
+
+### Editing prices & currencies
+
+`src/config/markets.ts` is the single source of truth for prices, electricity rates and the
+currency list (USD / GHS). Two ways to change them:
+
+1. **Permanent (everyone):** edit `markets.ts` and redeploy.
+2. **Live (this browser):** open **`/admin`** and edit the JSON — changes apply instantly across the
+   app and persist in `localStorage`. Use **Download JSON** there and paste it into `markets.ts` to
+   make the change permanent. `/admin` is unauthenticated — protect it before exposing it publicly.
 
 ## Features
 

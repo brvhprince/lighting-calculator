@@ -2,6 +2,21 @@ export type UnitSystem = 'metric' | 'imperial';
 
 export type NaturalLightLevel = 'none' | 'some' | 'ample';
 
+// Normalized room design config shared by the Calculator and Designer.
+// Ceiling/peak are stored in FEET (internal standard) and shown in the active unit.
+export type RoomConfigValue = {
+  roomType: string;
+  customRoomName: string;
+  customRoomLumens: string; // lumens/ft² for a custom room
+  ceilingFt: number;
+  sloped: boolean;
+  ceilingPeakFt: number;
+  naturalLight: NaturalLightLevel;
+  fixtureSize: string; // '' = auto-select
+  customFixtureLumens: string; // advanced
+  customLumensPerSqFt: string; // advanced override
+};
+
 export type RoomType = {
   name: string;
   lumensPerSqFt: {

@@ -1,4 +1,4 @@
-import { CalculationInput, CalculationResult, UnitSystem, FixtureSize } from '@/types';
+import { CalculationInput, CalculationResult, UnitSystem, FixtureSize, NaturalLightLevel } from '@/types';
 import { ROOM_TYPES } from './roomTypes';
 import { FIXTURE_SIZES } from './fixtureTypes';
 
@@ -8,85 +8,68 @@ const INCHES_TO_FEET = 1 / 12;
 const MM_TO_METERS = 0.001;
 const MM_TO_FEET = 0.00328084;
 
-export function calculateLighting(input: CalculationInput): CalculationResult {
-  // Step 1: Calculate area in square feet (internal standard)
-  const area = calculateArea(input.length, input.width, input.unitSystem);
-  const areaInSqFt = input.unitSystem === 'metric' ? area / SQ_FT_TO_SQ_M : area;
+// Shared, geometry-agnostic core. Given a floor area and design parameters it
+// computes the full CalculationResult. The spacing/layout is delegated to the
+// caller via `makeSpacing` so a rectangular room (grid) and a drawn polygon
+// (clipped placement) can both feed the exact same lighting pipeline.
+export type AreaLightingParams = {
+  areaInSqFt: number;
+  areaDisplay: number; // area value in the caller's unit (result.area)
+  unitSystem: UnitSystem;
+  roomType: string;
+  customLumensPerSqFt?: number;
+  ceilingHeightFt: number; // already resolved (sloped → average)
+  naturalLight?: NaturalLightLevel;
+  fixtureSize?: string;
+  customFixtureLumens?: number;
+  makeSpacing: (numberOfFixtures: number) => CalculationResult['spacing'];
+};
 
-  // Step 2: Determine lumens per square foot
-  const lumensPerSqFt = input.customLumensPerSqFt ||
-    ROOM_TYPES[input.roomType]?.lumensPerSqFt.recommended ||
-    25;
+export function buildLightingResult(p: AreaLightingParams): CalculationResult {
+  const lumensPerSqFt =
+    p.customLumensPerSqFt || ROOM_TYPES[p.roomType]?.lumensPerSqFt.recommended || 25;
 
-  // Step 3: Calculate base lumens, then adjust for ceiling height.
-  // Light spreads and attenuates with mounting height. A standard residential
-  // ceiling is 8 ft; taller ceilings need proportionally more output to land the
-  // same illuminance on the working plane (~10% per foot above 8 ft).
-  const baseLumensNeeded = Math.ceil(areaInSqFt * lumensPerSqFt);
-
-  // For a sloped/vaulted ceiling, light is designed to the average height
-  // between the low (wall) side and the high (peak) side.
-  let ceilingHeightFt = resolveCeilingHeightFt(input.ceilingHeight, input.unitSystem);
-  if (input.slopedCeiling && input.ceilingPeakHeight) {
-    const peakFt = resolveCeilingHeightFt(input.ceilingPeakHeight, input.unitSystem);
-    ceilingHeightFt = (ceilingHeightFt + peakFt) / 2;
-  }
-  const ceilingFactor = computeCeilingFactor(ceilingHeightFt);
-
-  // Natural daylight from windows/skylights offsets some artificial light.
-  const naturalLightFactor = naturalLightMultiplier(input.naturalLight);
-
+  const baseLumensNeeded = Math.ceil(p.areaInSqFt * lumensPerSqFt);
+  const ceilingFactor = computeCeilingFactor(p.ceilingHeightFt);
+  const naturalLightFactor = naturalLightMultiplier(p.naturalLight);
   const totalLumensNeeded = Math.ceil(baseLumensNeeded * ceilingFactor * naturalLightFactor);
 
-  // Step 4: Determine lumens per fixture
+  // Lumens per fixture
   let lumensPerFixture: number;
   let fixtureSizeName: string;
-
-  if (input.customFixtureLumens) {
-    lumensPerFixture = input.customFixtureLumens;
-    fixtureSizeName = input.fixtureSize
-      ? FIXTURE_SIZES[input.fixtureSize]?.name || 'Custom'
-      : 'Custom';
-  } else if (input.fixtureSize && FIXTURE_SIZES[input.fixtureSize]) {
-    const fixture = FIXTURE_SIZES[input.fixtureSize];
+  if (p.customFixtureLumens) {
+    lumensPerFixture = p.customFixtureLumens;
+    fixtureSizeName = p.fixtureSize ? FIXTURE_SIZES[p.fixtureSize]?.name || 'Custom' : 'Custom';
+  } else if (p.fixtureSize && FIXTURE_SIZES[p.fixtureSize]) {
+    const fixture = FIXTURE_SIZES[p.fixtureSize];
     lumensPerFixture = fixture.typicalLumens.recommended;
     fixtureSizeName = fixture.name;
   } else {
-    // Auto-select fixture size based on room size and lumens needed
-    const avgLumensPerFixture = totalLumensNeeded / Math.max(4, Math.ceil(areaInSqFt / 25));
+    const avgLumensPerFixture = totalLumensNeeded / Math.max(4, Math.ceil(p.areaInSqFt / 25));
     const selectedFixture = autoSelectFixture(avgLumensPerFixture);
     lumensPerFixture = selectedFixture.typicalLumens.recommended;
     fixtureSizeName = selectedFixture.name;
   }
 
-  // Step 5: Calculate number of fixtures
   const numberOfFixtures = Math.ceil(totalLumensNeeded / lumensPerFixture);
+  const spacing = p.makeSpacing(numberOfFixtures);
 
-  // Step 6: Calculate spacing
-  const spacing = calculateSpacing(
-    input.length,
-    input.width,
-    numberOfFixtures,
-    input.unitSystem
-  );
-
-  // Step 7: Generate recommendations
   const recommendations = generateRecommendations(
-    input,
-    areaInSqFt,
+    { roomType: p.roomType, customFixtureLumens: p.customFixtureLumens, naturalLight: p.naturalLight },
+    p.areaInSqFt,
     numberOfFixtures,
     lumensPerFixture,
     totalLumensNeeded,
-    ceilingHeightFt,
+    p.ceilingHeightFt,
     ceilingFactor
   );
 
   return {
-    area,
-    areaUnit: input.unitSystem === 'metric' ? 'm²' : 'ft²',
+    area: p.areaDisplay,
+    areaUnit: p.unitSystem === 'metric' ? 'm²' : 'ft²',
     totalLumensNeeded,
     baseLumensNeeded,
-    ceilingHeightFt,
+    ceilingHeightFt: p.ceilingHeightFt,
     ceilingFactor,
     naturalLightFactor,
     lumensPerSqFt,
@@ -94,8 +77,58 @@ export function calculateLighting(input: CalculationInput): CalculationResult {
     numberOfFixtures,
     fixtureSize: fixtureSizeName,
     spacing,
-    recommendations
+    recommendations,
   };
+}
+
+// Resolve a ceiling configuration (incl. sloped/vaulted average) to feet.
+export function resolveCeiling(
+  ceilingHeight: number | undefined,
+  unitSystem: UnitSystem,
+  slopedCeiling?: boolean,
+  ceilingPeakHeight?: number
+): number {
+  let ft = resolveCeilingHeightFt(ceilingHeight, unitSystem);
+  if (slopedCeiling && ceilingPeakHeight) {
+    const peakFt = resolveCeilingHeightFt(ceilingPeakHeight, unitSystem);
+    ft = (ft + peakFt) / 2;
+  }
+  return ft;
+}
+
+// Convert a dimension entered in the active unit system to feet (the internal
+// standard), mirroring how area is computed (imperial >50 ⇒ inches, metric
+// >100 ⇒ millimetres).
+export function dimToFeet(value: number, unitSystem: UnitSystem): number {
+  if (unitSystem === 'metric') {
+    const meters = value > 100 ? value * MM_TO_METERS : value;
+    return meters / 0.3048;
+  }
+  return value > 50 ? value * INCHES_TO_FEET : value;
+}
+
+export function calculateLighting(input: CalculationInput): CalculationResult {
+  const area = calculateArea(input.length, input.width, input.unitSystem);
+  const areaInSqFt = input.unitSystem === 'metric' ? area / SQ_FT_TO_SQ_M : area;
+  const ceilingHeightFt = resolveCeiling(
+    input.ceilingHeight,
+    input.unitSystem,
+    input.slopedCeiling,
+    input.ceilingPeakHeight
+  );
+
+  return buildLightingResult({
+    areaInSqFt,
+    areaDisplay: area,
+    unitSystem: input.unitSystem,
+    roomType: input.roomType,
+    customLumensPerSqFt: input.customLumensPerSqFt,
+    ceilingHeightFt,
+    naturalLight: input.naturalLight,
+    fixtureSize: input.fixtureSize,
+    customFixtureLumens: input.customFixtureLumens,
+    makeSpacing: (n) => calculateSpacing(input.length, input.width, n, input.unitSystem),
+  });
 }
 
 const FEET_PER_METER = 3.28084;
@@ -272,7 +305,7 @@ function calculateSpacing(
 }
 
 function generateRecommendations(
-  input: CalculationInput,
+  input: { roomType: string; customFixtureLumens?: number; naturalLight?: NaturalLightLevel },
   areaInSqFt: number,
   numberOfFixtures: number,
   lumensPerFixture: number,

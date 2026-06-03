@@ -5,77 +5,88 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Calculator, Lightbulb, Ruler, Grid3x3, Save, ArrowUpDown, Wand2, Share2, Check } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Calculator, Grid3x3, Save, Wand2, Share2, Check, Pentagon } from 'lucide-react';
 import { ROOM_TYPES } from '@/lib/roomTypes';
-import { FIXTURE_SIZES } from '@/lib/fixtureTypes';
 import { ROOM_PRESETS, presetDimensions, RoomPreset } from '@/lib/roomPresets';
-import { calculateLighting } from '@/lib/calculator';
-import { CalculationInput, CalculationResult, UnitSystem, NaturalLightLevel } from '@/types';
+import { calculateLighting, dimToFeet } from '@/lib/calculator';
+import { rectangleShape } from '@/lib/geometry';
+import { CalculationInput, CalculationResult, UnitSystem, RoomConfigValue } from '@/types';
 import { SavedCalculations } from './SavedCalculations';
 import { SavedCalculation } from '@/types/saved-calculations';
 import { saveCalculation, generateCalculationId } from '@/lib/savedCalculations';
-import { ShoppingList } from './ShoppingList';
 import { PDFExport } from './PDFExport';
-import { buildShareUrl, decodeInput } from '@/lib/shareUrl';
-import { CostEnergyEstimator } from './CostEnergyEstimator';
-import { LightingZones } from './LightingZones';
-import { ProductRecommendations } from './ProductRecommendations';
+import { buildShareUrl, decodeInput, buildDesignerUrl, DesignerState } from '@/lib/shareUrl';
+import { LightingResults } from './LightingResults';
+import { RoomConfigFields, defaultRoomConfig } from './RoomConfigFields';
 
 export default function FullLightingCalculator() {
+  const router = useRouter();
   const [unitSystem, setUnitSystem] = useState<UnitSystem>('imperial');
   const [length, setLength] = useState<string>('');
   const [width, setWidth] = useState<string>('');
-  const [ceilingHeight, setCeilingHeight] = useState<string>('');
-  const [slopedCeiling, setSlopedCeiling] = useState(false);
-  const [ceilingPeakHeight, setCeilingPeakHeight] = useState<string>('');
-  const [naturalLight, setNaturalLight] = useState<NaturalLightLevel>('none');
-  const [roomType, setRoomType] = useState<string>('');
-  const [customRoomName, setCustomRoomName] = useState<string>('');
-  const [customRoomLumens, setCustomRoomLumens] = useState<string>('');
   const [isExpert, setIsExpert] = useState(false);
-  const [customLumens, setCustomLumens] = useState<string>('');
-  const [fixtureSize, setFixtureSize] = useState<string>('');
-  const [customFixtureLumens, setCustomFixtureLumens] = useState<string>('');
+  const [config, setConfig] = useState<RoomConfigValue>(() => defaultRoomConfig());
+  const updateConfig = (patch: Partial<RoomConfigValue>) => setConfig((c) => ({ ...c, ...patch }));
   const [result, setResult] = useState<CalculationResult | null>(null);
   const [description, setDescription] = useState<string>('');
   const [shareCopied, setShareCopied] = useState(false);
+
+  // Ceiling/peak are stored in feet in config; CalculationInput expects the
+  // active unit (resolveCeiling reads metric as m, imperial as ft).
+  const ftToUnit = useCallback(
+    (ft: number) => (unitSystem === 'metric' ? ft * 0.3048 : ft),
+    [unitSystem]
+  );
 
   const buildInput = useCallback((): CalculationInput => ({
     length: parseFloat(length),
     width: parseFloat(width),
     unitSystem,
-    roomType,
+    roomType: config.roomType,
     isExpert,
-    ceilingHeight: ceilingHeight ? parseFloat(ceilingHeight) : undefined,
-    slopedCeiling: slopedCeiling || undefined,
-    ceilingPeakHeight: slopedCeiling && ceilingPeakHeight ? parseFloat(ceilingPeakHeight) : undefined,
-    naturalLight: naturalLight !== 'none' ? naturalLight : undefined,
+    ceilingHeight: config.ceilingFt ? ftToUnit(config.ceilingFt) : undefined,
+    slopedCeiling: config.sloped || undefined,
+    ceilingPeakHeight: config.sloped && config.ceilingPeakFt ? ftToUnit(config.ceilingPeakFt) : undefined,
+    naturalLight: config.naturalLight !== 'none' ? config.naturalLight : undefined,
     customLumensPerSqFt:
-      roomType === 'other' && customRoomLumens
-        ? parseFloat(customRoomLumens)
-        : customLumens
-        ? parseFloat(customLumens)
+      config.roomType === 'other' && config.customRoomLumens
+        ? parseFloat(config.customRoomLumens)
+        : config.customLumensPerSqFt
+        ? parseFloat(config.customLumensPerSqFt)
         : undefined,
-    fixtureSize: fixtureSize || undefined,
-    customFixtureLumens: customFixtureLumens ? parseFloat(customFixtureLumens) : undefined,
-  }), [length, width, unitSystem, roomType, isExpert, ceilingHeight, slopedCeiling, ceilingPeakHeight, naturalLight, customRoomLumens, customLumens, fixtureSize, customFixtureLumens]);
+    fixtureSize: config.fixtureSize || undefined,
+    customFixtureLumens: config.customFixtureLumens ? parseFloat(config.customFixtureLumens) : undefined,
+  }), [length, width, unitSystem, config, isExpert, ftToUnit]);
 
   // Apply a decoded/loaded input to the form state.
   const applyInput = useCallback((input: CalculationInput) => {
     setUnitSystem(input.unitSystem);
     setLength(input.length.toString());
     setWidth(input.width.toString());
-    setRoomType(input.roomType);
     setIsExpert(input.isExpert);
-    setCeilingHeight(input.ceilingHeight?.toString() || '');
-    setSlopedCeiling(input.slopedCeiling ?? false);
-    setCeilingPeakHeight(input.ceilingPeakHeight?.toString() || '');
-    setNaturalLight(input.naturalLight ?? 'none');
-    setCustomLumens(input.customLumensPerSqFt?.toString() || '');
-    setFixtureSize(input.fixtureSize || '');
-    setCustomFixtureLumens(input.customFixtureLumens?.toString() || '');
+    setConfig(
+      defaultRoomConfig({
+        roomType: input.roomType,
+        customRoomLumens:
+          input.roomType === 'other' && input.customLumensPerSqFt
+            ? String(input.customLumensPerSqFt)
+            : '',
+        customLumensPerSqFt:
+          input.roomType !== 'other' && input.customLumensPerSqFt
+            ? String(input.customLumensPerSqFt)
+            : '',
+        ceilingFt: input.ceilingHeight ? dimToFeet(input.ceilingHeight, input.unitSystem) : 8,
+        sloped: input.slopedCeiling ?? false,
+        ceilingPeakFt: input.ceilingPeakHeight
+          ? dimToFeet(input.ceilingPeakHeight, input.unitSystem)
+          : 0,
+        naturalLight: input.naturalLight ?? 'none',
+        fixtureSize: input.fixtureSize || '',
+        customFixtureLumens: input.customFixtureLumens?.toString() || '',
+      })
+    );
   }, []);
 
   // Load a shared configuration from the URL (?c=...) on first render.
@@ -101,17 +112,31 @@ export default function FullLightingCalculator() {
     }
   };
 
+  // Hand off to the Room Designer as an editable rectangle carrying the config.
+  const openInDesigner = () => {
+    if (!length || !width) {
+      alert('Enter room dimensions first');
+      return;
+    }
+    const wFt = dimToFeet(parseFloat(width), unitSystem);
+    const lFt = dimToFeet(parseFloat(length), unitSystem);
+    const state: DesignerState = {
+      unit: unitSystem,
+      config: { ...config, roomType: config.roomType || 'livingRoom' },
+      points: rectangleShape(wFt, lFt),
+    };
+    router.push(buildDesignerUrl(state));
+  };
+
   const handleCalculate = () => {
-    if (!length || !width || !roomType) {
+    if (!length || !width || !config.roomType) {
       alert('Please fill in room dimensions and select a room type');
       return;
     }
 
-    if (roomType === 'other') {
-      if (!customRoomName || !customRoomLumens) {
-        alert('Please enter a room name and lumens per square foot for custom room type');
-        return;
-      }
+    if (config.roomType === 'other' && (!config.customRoomName || !config.customRoomLumens)) {
+      alert('Please enter a room name and lumens per square foot for custom room type');
+      return;
     }
 
     setResult(calculateLighting(buildInput()));
@@ -122,9 +147,10 @@ export default function FullLightingCalculator() {
 
     const input = buildInput();
 
-    const roomName = roomType === 'other' && customRoomName
-      ? customRoomName
-      : ROOM_TYPES[roomType]?.name || 'Room';
+    const roomName =
+      config.roomType === 'other' && config.customRoomName
+        ? config.customRoomName
+        : ROOM_TYPES[config.roomType]?.name || 'Room';
     const savedCalc: SavedCalculation = {
       id: generateCalculationId(),
       name: `${roomName} - ${result.area.toFixed(0)} ${result.areaUnit}`,
@@ -149,17 +175,12 @@ export default function FullLightingCalculator() {
     const dims = presetDimensions(preset, unitSystem);
     setLength(dims.length);
     setWidth(dims.width);
-    setCeilingHeight(dims.ceiling);
-    setRoomType(preset.roomType);
+    updateConfig({ roomType: preset.roomType, ceilingFt: preset.ceilingFt });
     setResult(null);
   };
 
   const getDimensionLabel = () => {
     return unitSystem === 'metric' ? 'millimeters (mm) or meters (m)' : 'inches or feet';
-  };
-
-  const getCeilingLabel = () => {
-    return unitSystem === 'metric' ? 'meters (m)' : 'feet (ft)';
   };
 
   return (
@@ -258,127 +279,7 @@ export default function FullLightingCalculator() {
             </div>
           </div>
 
-          {/* Ceiling Height */}
-          <div className="space-y-2">
-            <Label htmlFor="ceilingHeight" className="flex items-center gap-1.5">
-              <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-              Ceiling Height <span className="text-muted-foreground text-xs">({getCeilingLabel()}, optional)</span>
-            </Label>
-            <Input
-              id="ceilingHeight"
-              type="number"
-              placeholder={unitSystem === 'metric' ? '2.7' : '8'}
-              value={ceilingHeight}
-              onChange={(e) => setCeilingHeight(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              Taller ceilings need more output to reach the floor. Leave blank to assume a standard{' '}
-              {unitSystem === 'metric' ? '2.4 m' : '8 ft'} ceiling.
-            </p>
-          </div>
-
-          {/* Sloped / vaulted ceiling */}
-          <div className="space-y-3">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                className="h-4 w-4 rounded border-input accent-[hsl(var(--brand-bronze))]"
-                checked={slopedCeiling}
-                onChange={(e) => setSlopedCeiling(e.target.checked)}
-              />
-              <span className="text-sm font-medium">Sloped / vaulted ceiling</span>
-            </label>
-            {slopedCeiling && (
-              <div className="space-y-2 pl-6">
-                <Label htmlFor="ceilingPeak">
-                  Peak Height <span className="text-muted-foreground text-xs">({getCeilingLabel()})</span>
-                </Label>
-                <Input
-                  id="ceilingPeak"
-                  type="number"
-                  placeholder={unitSystem === 'metric' ? '3.6' : '12'}
-                  value={ceilingPeakHeight}
-                  onChange={(e) => setCeilingPeakHeight(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  We design to the average of the wall height (above) and this peak.
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Natural light */}
-          <div className="space-y-2">
-            <Label htmlFor="naturalLight">Natural Light</Label>
-            <Select value={naturalLight} onValueChange={(v) => setNaturalLight(v as NaturalLightLevel)}>
-              <SelectTrigger id="naturalLight">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No / minimal windows</SelectItem>
-                <SelectItem value="some">Some daylight (standard windows)</SelectItem>
-                <SelectItem value="ample">Ample daylight (large windows / skylights)</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Daylight offsets artificial lighting needs by up to 20%.
-            </p>
-          </div>
-
-          {/* Room Type */}
-          <div className="space-y-2">
-            <Label htmlFor="roomType">Room Type</Label>
-            <Select value={roomType} onValueChange={setRoomType}>
-              <SelectTrigger id="roomType">
-                <SelectValue placeholder="Select room type" />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(ROOM_TYPES).map(([key, room]) => (
-                  <SelectItem key={key} value={key}>
-                    {room.name} ({room.lumensPerSqFt.recommended} lumens/ft²)
-                  </SelectItem>
-                ))}
-                <SelectItem value="other">Other (Custom)</SelectItem>
-              </SelectContent>
-            </Select>
-            {roomType && roomType !== 'other' && (
-              <p className="text-sm text-muted-foreground">
-                {ROOM_TYPES[roomType]?.description}
-              </p>
-            )}
-          </div>
-
-          {/* Custom Room Type Fields */}
-          {roomType === 'other' && (
-            <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
-              <h4 className="font-semibold text-sm">Custom Room Type</h4>
-              <div className="space-y-2">
-                <Label htmlFor="customRoomName">Room Name</Label>
-                <Input
-                  id="customRoomName"
-                  type="text"
-                  placeholder="e.g., Sunroom, Workshop, Studio"
-                  value={customRoomName}
-                  onChange={(e) => setCustomRoomName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="customRoomLumens">Lumens per Square Foot</Label>
-                <Input
-                  id="customRoomLumens"
-                  type="number"
-                  placeholder="e.g., 30"
-                  value={customRoomLumens}
-                  onChange={(e) => setCustomRoomLumens(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Typical range: 10-80 lumens/ft² depending on room purpose
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Expert Mode Toggle */}
+          {/* Experience level */}
           <div className="space-y-3">
             <Label>Experience Level</Label>
             <RadioGroup
@@ -401,57 +302,14 @@ export default function FullLightingCalculator() {
             </RadioGroup>
           </div>
 
-          {/* Expert Options */}
-          {isExpert && (
-            <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
-              <h4 className="font-semibold text-sm">Professional Options</h4>
-
-              <div className="space-y-2">
-                <Label htmlFor="customLumens">
-                  Custom Lumens per Square Foot (optional)
-                </Label>
-                <Input
-                  id="customLumens"
-                  type="number"
-                  placeholder="e.g., 35"
-                  value={customLumens}
-                  onChange={(e) => setCustomLumens(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="fixtureSize">Fixture Size (optional)</Label>
-                <Select value={fixtureSize || undefined} onValueChange={setFixtureSize}>
-                  <SelectTrigger id="fixtureSize">
-                    <SelectValue placeholder="Auto-select based on room" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(FIXTURE_SIZES).map(([key, fixture]) => (
-                      <SelectItem key={key} value={key}>
-                        {fixture.name} ({fixture.typicalLumens.recommended} lumens typical)
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="customFixtureLumens">
-                  Fixture Lumen Rating (optional)
-                </Label>
-                <Input
-                  id="customFixtureLumens"
-                  type="number"
-                  placeholder="e.g., 800"
-                  value={customFixtureLumens}
-                  onChange={(e) => setCustomFixtureLumens(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Enter the exact lumen rating of your fixtures if known
-                </p>
-              </div>
-            </div>
-          )}
+          {/* Shared room configuration */}
+          <RoomConfigFields
+            value={config}
+            onChange={updateConfig}
+            unitSystem={unitSystem}
+            showAdvanced={isExpert}
+            idPrefix="calc"
+          />
 
           <Button onClick={handleCalculate} className="w-full" size="lg">
             <Calculator className="mr-2 h-4 w-4" />
@@ -476,181 +334,87 @@ export default function FullLightingCalculator() {
                 onChange={(e) => setDescription(e.target.value)}
               />
             </div>
+            <Button onClick={openInDesigner} variant="outline" className="gap-2">
+              <Pentagon className="h-4 w-4" />
+              Open in Designer
+            </Button>
             <Button onClick={handleShare} variant="outline" className="gap-2">
               {shareCopied ? <Check className="h-4 w-4 text-brand-sage" /> : <Share2 className="h-4 w-4" />}
               {shareCopied ? 'Link copied' : 'Share'}
             </Button>
             <PDFExport
               result={result}
-              roomType={roomType}
-              customRoomName={roomType === 'other' ? customRoomName : undefined}
+              roomType={config.roomType}
+              customRoomName={config.roomType === 'other' ? config.customRoomName : undefined}
             />
             <Button onClick={handleSave} variant="default" className="gap-2">
               <Save className="h-4 w-4" />
               Save Calculation
             </Button>
           </div>
-          <div className="grid gap-6 md:grid-cols-2">
-          {/* Main Results */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Lightbulb className="h-5 w-5" />
-                Lighting Requirements
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Room Area</p>
-                  <p className="text-2xl font-bold">
-                    {result.area.toFixed(1)} {result.areaUnit}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Total Lumens</p>
-                  <p className="text-2xl font-bold">
-                    {result.totalLumensNeeded.toLocaleString()}
-                  </p>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Number of Fixtures:</span>
-                  <span className="font-semibold">{result.numberOfFixtures}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Fixture Size:</span>
-                  <span className="font-semibold">{result.fixtureSize}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Lumens per Fixture:</span>
-                  <span className="font-semibold">{result.lumensPerFixture}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Lumens per Sq Ft:</span>
-                  <span className="font-semibold">{result.lumensPerSqFt}</span>
-                </div>
-                {result.ceilingFactor != null && result.ceilingFactor !== 1 && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">
-                      Ceiling Adjustment ({result.ceilingHeightFt?.toFixed(1)} ft):
-                    </span>
-                    <span className="font-semibold text-brand-bronze">
-                      {result.ceilingFactor > 1 ? '+' : ''}
-                      {Math.round((result.ceilingFactor - 1) * 100)}%
-                    </span>
-                  </div>
-                )}
-                {result.naturalLightFactor != null && result.naturalLightFactor !== 1 && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Daylight Reduction:</span>
-                    <span className="font-semibold text-brand-sage">
-                      −{Math.round((1 - result.naturalLightFactor) * 100)}%
-                    </span>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Spacing Guide */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Grid3x3 className="h-5 w-5" />
-                Spacing & Layout
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Grid Layout:</span>
-                  <span className="font-semibold">
-                    {result.spacing.layout.rows} rows × {result.spacing.layout.columns} columns
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Distance from Wall:</span>
-                  <span className="font-semibold">
-                    {result.spacing.fromWall} {result.spacing.unit}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Row Spacing:</span>
-                  <span className="font-semibold">
-                    {result.spacing.layout.rowSpacing} {result.spacing.unit}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Column Spacing:</span>
-                  <span className="font-semibold">
-                    {result.spacing.layout.columnSpacing} {result.spacing.unit}
-                  </span>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t">
-                <div className="aspect-square w-full border-2 border-dashed rounded-lg p-4 relative bg-muted/20">
-                  <div className="absolute inset-0 grid gap-2 p-4"
-                    style={{
-                      gridTemplateColumns: `repeat(${result.spacing.layout.columns}, 1fr)`,
-                      gridTemplateRows: `repeat(${result.spacing.layout.rows}, 1fr)`,
-                    }}
-                  >
-                    {Array.from({ length: result.numberOfFixtures }).map((_, i) => (
-                      <div key={i} className="flex items-center justify-center">
-                        <div className="w-3 h-3 bg-primary rounded-full" />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <p className="text-xs text-center text-muted-foreground mt-2">
-                  Fixture layout visualization
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Recommendations */}
-          <Card className="md:col-span-2">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Ruler className="h-5 w-5" />
-                Recommendations
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2">
-                {result.recommendations.map((rec, index) => (
-                  <li key={index} className="flex gap-2 text-sm">
-                    <span className="text-primary mt-0.5">•</span>
-                    <span>{rec}</span>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        </div>
-
-          {/* Layered lighting plan */}
-          <LightingZones roomType={roomType} totalLumens={result.totalLumensNeeded} />
-
-          {/* Cost & Energy */}
-          <CostEnergyEstimator result={result} />
-
-          {/* Product recommendations */}
-          <ProductRecommendations
-            roomType={roomType}
-            ceilingHeightFt={result.ceilingHeightFt ?? 8}
-          />
-
-          {/* Shopping List */}
-          <ShoppingList
+          <LightingResults
             result={result}
-            roomType={roomType}
-            customRoomName={roomType === 'other' ? customRoomName : undefined}
+            roomType={config.roomType}
+            customRoomName={config.roomType === 'other' ? config.customRoomName : undefined}
+            visual={
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Grid3x3 className="h-5 w-5" />
+                    Spacing &amp; Layout
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Grid Layout:</span>
+                      <span className="font-semibold">
+                        {result.spacing.layout.rows} rows × {result.spacing.layout.columns} columns
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Distance from Wall:</span>
+                      <span className="font-semibold">
+                        {result.spacing.fromWall} {result.spacing.unit}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Row Spacing:</span>
+                      <span className="font-semibold">
+                        {result.spacing.layout.rowSpacing} {result.spacing.unit}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Column Spacing:</span>
+                      <span className="font-semibold">
+                        {result.spacing.layout.columnSpacing} {result.spacing.unit}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t">
+                    <div className="aspect-square w-full border-2 border-dashed rounded-lg p-4 relative bg-muted/20">
+                      <div
+                        className="absolute inset-0 grid gap-2 p-4"
+                        style={{
+                          gridTemplateColumns: `repeat(${result.spacing.layout.columns}, 1fr)`,
+                          gridTemplateRows: `repeat(${result.spacing.layout.rows}, 1fr)`,
+                        }}
+                      >
+                        {Array.from({ length: result.numberOfFixtures }).map((_, i) => (
+                          <div key={i} className="flex items-center justify-center">
+                            <div className="w-3 h-3 bg-brand-bronze rounded-full" />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-xs text-center text-muted-foreground mt-2">
+                      Fixture layout visualization
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            }
           />
         </>
       )}
