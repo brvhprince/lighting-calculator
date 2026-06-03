@@ -41,13 +41,17 @@ USD / GHS). At runtime those defaults are **overridden by values saved in the da
 
 #### Database setup (one-time)
 
+`prisma.config.ts` loads `.env.local`, so the CLI picks up `DATABASE_URL` automatically:
+
 ```bash
-# Prisma reads .env, your URL is in .env.local — inject it for the CLI:
-DATABASE_URL="$(grep -E '^DATABASE_URL=' .env.local | cut -d= -f2- | tr -d '\"')" npx prisma db push
+npm run db:push   # create the Setting table
+npm run db:seed   # seed it from src/config/markets.ts (optional)
 ```
 
-This creates the single `Setting` table. On Vercel, `prisma generate` runs automatically during the
-build; set the env vars in Project → Settings → Environment Variables.
+Stack: **Prisma 7** with the `prisma-client` generator (output `src/generated/prisma`, git-ignored,
+regenerated on each build) and Prisma Postgres via **Accelerate** — the connection is passed to the
+client as `accelerateUrl` (see `src/lib/prisma.ts`). On Vercel, `prisma generate` runs automatically
+during the build; set the env vars in Project → Settings → Environment Variables.
 
 ## Features
 
