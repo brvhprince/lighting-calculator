@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
+import { createAdminToken } from '@/lib/adminAuth';
+
+export const runtime = 'nodejs';
 
 // Validates the admin passcode server-side so it never ships in the client
 // bundle. Set ADMIN_PASSCODE in your environment (e.g. Vercel project settings);
-// falls back to a dev default if unset.
+// falls back to a dev default if unset. On success, returns a short-lived signed
+// token the client sends when saving config.
 export async function POST(req: Request) {
   let passcode = '';
   try {
@@ -13,11 +17,9 @@ export async function POST(req: Request) {
   }
 
   const expected = process.env.ADMIN_PASSCODE || 'penlabs';
-
-  // Length-tolerant constant-ish comparison.
   const ok = passcode.length === expected.length && safeEqual(passcode, expected);
 
-  if (ok) return NextResponse.json({ ok: true });
+  if (ok) return NextResponse.json({ ok: true, token: createAdminToken() });
   return NextResponse.json({ ok: false }, { status: 401 });
 }
 

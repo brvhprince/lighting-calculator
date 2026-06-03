@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Lock, LogOut, AlertTriangle } from 'lucide-react';
 
 const SESSION_KEY = 'pen-admin-authed';
+const TOKEN_KEY = 'pen-admin-token';
 
 export function AdminGate({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
@@ -33,6 +34,8 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ passcode: code }),
       });
       if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (data?.token) sessionStorage.setItem(TOKEN_KEY, data.token);
         sessionStorage.setItem(SESSION_KEY, 'true');
         setAuthed(true);
         setCode('');
@@ -48,6 +51,7 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
 
   const lock = () => {
     sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(TOKEN_KEY);
     setAuthed(false);
   };
 

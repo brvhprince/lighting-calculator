@@ -22,13 +22,32 @@ Pen Homes standard.
 
 ### Editing prices & currencies
 
-`src/config/markets.ts` is the single source of truth for prices, electricity rates and the
-currency list (USD / GHS). Two ways to change them:
+`src/config/markets.ts` holds the built-in defaults (prices, electricity rates, currency list:
+USD / GHS). At runtime those defaults are **overridden by values saved in the database**, edited at
+**`/admin`** (passcode-gated). Saved edits are live for everyone and survive deploys.
 
-1. **Permanent (everyone):** edit `markets.ts` and redeploy.
-2. **Live (this browser):** open **`/admin`** and edit the JSON — changes apply instantly across the
-   app and persist in `localStorage`. Use **Download JSON** there and paste it into `markets.ts` to
-   make the change permanent. `/admin` is unauthenticated — protect it before exposing it publicly.
+- **`/admin`** → enter passcode → edit JSON → **Validate & Save** (writes to Postgres via Prisma).
+- **Download JSON** for a backup / to update the `markets.ts` defaults.
+- `markets.ts` defaults still apply wherever the DB has no override (and as a fallback if the DB is
+  unreachable).
+
+#### Required environment variables
+
+| Var | Purpose |
+|-----|---------|
+| `DATABASE_URL` | Prisma Postgres (Accelerate) connection string |
+| `AUTH_SECRET` | Signs the short-lived admin session token |
+| `ADMIN_PASSCODE` | Passcode for `/admin` (defaults to `penlabs` if unset) |
+
+#### Database setup (one-time)
+
+```bash
+# Prisma reads .env, your URL is in .env.local — inject it for the CLI:
+DATABASE_URL="$(grep -E '^DATABASE_URL=' .env.local | cut -d= -f2- | tr -d '\"')" npx prisma db push
+```
+
+This creates the single `Setting` table. On Vercel, `prisma generate` runs automatically during the
+build; set the env vars in Project → Settings → Environment Variables.
 
 ## Features
 

@@ -11,6 +11,7 @@ export default function AdminConfigEditor() {
   const { markets, setOverrides, resetOverrides, format } = useCurrency();
   const [text, setText] = useState('');
   const [status, setStatus] = useState<{ kind: 'ok' | 'error'; msg: string } | null>(null);
+  const [saving, setSaving] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   // Load the current effective markets into the editor.
@@ -20,7 +21,24 @@ export default function AdminConfigEditor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const save = () => {
+  // Persist to the server (Postgres) so the config survives deploys and is shared
+  // across devices. `markets` of {} resets to defaults.
+  const persist = async (value: MarketOverrides): Promise<boolean> => {
+    const token = sessionStorage.getItem('pen-admin-token');
+    const res = await fetch('/api/admin/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token ?? ''}` },
+      body: JSON.stringify({ markets: value }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setStatus({ kind: 'error', msg: data?.error || `Save failed (HTTP ${res.status}).` });
+      return false;
+    }
+    return true;
+  };
+
+  const save = async () => {
     let parsed: unknown;
     try {
       parsed = JSON.parse(text);
@@ -33,14 +51,24 @@ export default function AdminConfigEditor() {
       setStatus({ kind: 'error', msg: err });
       return;
     }
-    setOverrides(parsed as MarketOverrides);
-    setStatus({ kind: 'ok', msg: 'Saved. Values are live across the app (stored in this browser).' });
+    setSaving(true);
+    const ok = await persist(parsed as MarketOverrides);
+    setSaving(false);
+    if (ok) {
+      setOverrides(parsed as MarketOverrides);
+      setStatus({ kind: 'ok', msg: 'Saved to the database — live for everyone, persists across deploys.' });
+    }
   };
 
-  const reset = () => {
-    resetOverrides();
-    setText(JSON.stringify(MARKETS, null, 2));
-    setStatus({ kind: 'ok', msg: 'Reset to built-in defaults.' });
+  const reset = async () => {
+    setSaving(true);
+    const ok = await persist({});
+    setSaving(false);
+    if (ok) {
+      resetOverrides();
+      setText(JSON.stringify(MARKETS, null, 2));
+      setStatus({ kind: 'ok', msg: 'Reset to built-in defaults (saved to the database).' });
+    }
   };
 
   const download = () => {
@@ -75,10 +103,11 @@ export default function AdminConfigEditor() {
         <div className="text-sm text-muted-foreground">
           <p className="font-medium text-foreground">Pricing &amp; market configuration</p>
           <p>
-            Edits apply instantly across the app and are stored in <strong>this browser</strong>. To make them
-            permanent for everyone, <strong>Download JSON</strong> and paste it into{' '}
-            <code className="rounded bg-muted px-1">src/config/markets.ts</code>, then redeploy. This page is
-            unauthenticated — protect it before exposing publicly.
+            Edits are saved to the <strong>database</strong> — live for everyone and persistent across
+            deploys. <strong>Download JSON</strong> any time for a backup or to seed{' '}
+            <code className="rounded bg-muted px-1">src/config/markets.ts</code> defaults. Requires{' '}
+            <code className="rounded bg-muted px-1">DATABASE_URL</code> set and the schema pushed
+            (<code className="rounded bg-muted px-1">npx prisma db push</code>).
           </p>
         </div>
       </div>
@@ -120,10 +149,10 @@ export default function AdminConfigEditor() {
           )}
 
           <div className="flex flex-wrap gap-2">
-            <Button onClick={save} className="gap-2">
-              <Save className="h-4 w-4" /> Validate &amp; Save
+            <Button onClick={save} disabled={saving} className="gap-2">
+              <Save className="h-4 w-4" /> {saving ? 'Saving…' : 'Validate & Save'}
             </Button>
-            <Button onClick={reset} variant="outline" className="gap-2">
+            <Button onClick={reset} disabled={saving} variant="outline" className="gap-2">
               <RotateCcw className="h-4 w-4" /> Reset to defaults
             </Button>
             <Button onClick={load} variant="outline">

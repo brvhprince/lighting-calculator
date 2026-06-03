@@ -1,0 +1,19 @@
+// Prisma schema for the Penlabs Lighting Calculator (Prisma 7).
+// Connection URLs live in prisma.config.ts (CLI) and are passed to the
+// PrismaClient constructor at runtime (accelerateUrl) — not in this file.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+  runtime  = "nodejs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}

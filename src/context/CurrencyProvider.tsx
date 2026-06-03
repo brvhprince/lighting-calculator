@@ -36,14 +36,33 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     const savedCurrency = localStorage.getItem(CURRENCY_KEY) as CurrencyCode | null;
     if (savedCurrency === 'USD' || savedCurrency === 'GHS') setCurrencyState(savedCurrency);
 
-    const savedOverrides = localStorage.getItem(OVERRIDES_KEY);
-    if (savedOverrides) {
+    // 1) Instant paint from the local cache.
+    const cached = localStorage.getItem(OVERRIDES_KEY);
+    if (cached) {
       try {
-        setOverridesState(JSON.parse(savedOverrides));
+        setOverridesState(JSON.parse(cached));
       } catch {
-        /* ignore corrupt overrides */
+        /* ignore corrupt cache */
       }
     }
+
+    // 2) Then reconcile with the server-persisted config (source of truth).
+    fetch('/api/admin/config')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data || typeof data.markets !== 'object') return;
+        const ov = Object.keys(data.markets).length ? (data.markets as MarketOverrides) : undefined;
+        setOverridesState(ov);
+        try {
+          if (ov) localStorage.setItem(OVERRIDES_KEY, JSON.stringify(ov));
+          else localStorage.removeItem(OVERRIDES_KEY);
+        } catch {
+          /* ignore */
+        }
+      })
+      .catch(() => {
+        /* offline / no DB — keep cached/default values */
+      });
   }, []);
 
   const setCurrency = useCallback((c: CurrencyCode) => {
