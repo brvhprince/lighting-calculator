@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Inbox, RefreshCw } from 'lucide-react';
+import { Inbox, RefreshCw, Download } from 'lucide-react';
 
 type Lead = {
   id: string;
@@ -42,6 +42,41 @@ export default function AdminLeads() {
     load();
   }, [load]);
 
+  const weekAgo = Date.now() - 7 * 86_400_000;
+  const last7 = leads.filter((l) => new Date(l.createdAt).getTime() >= weekAgo).length;
+
+  const exportCsv = () => {
+    const cols = ['createdAt', 'name', 'email', 'phone', 'roomName', 'source', 'message', 'fixtures', 'totalLumens', 'currency'];
+    const esc = (v: unknown) => {
+      const s = v == null ? '' : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const rows = leads.map((l) =>
+      [
+        l.createdAt,
+        l.name,
+        l.email,
+        l.phone ?? '',
+        l.roomName ?? '',
+        l.source ?? '',
+        l.message ?? '',
+        l.data?.fixtures ?? '',
+        l.data?.totalLumens ?? '',
+        l.data?.currency ?? '',
+      ]
+        .map(esc)
+        .join(',')
+    );
+    const csv = [cols.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pen-homes-leads-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -51,11 +86,24 @@ export default function AdminLeads() {
               <Inbox className="h-5 w-5 text-brand-bronze" />
               Quote requests ({leads.length})
             </CardTitle>
-            <CardDescription>Enquiries submitted from the calculator and designer.</CardDescription>
+            <CardDescription>
+              Enquiries from the calculator and designer · {last7} in the last 7 days.
+            </CardDescription>
           </div>
-          <Button variant="outline" size="sm" onClick={load} className="gap-1.5" disabled={loading}>
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportCsv}
+              className="gap-1.5"
+              disabled={leads.length === 0}
+            >
+              <Download className="h-4 w-4" /> CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={load} className="gap-1.5" disabled={loading}>
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
