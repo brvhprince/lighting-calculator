@@ -4,6 +4,9 @@ import {
   Text,
   View,
   StyleSheet,
+  Svg,
+  Polygon,
+  Circle,
   pdf,
 } from '@react-pdf/renderer';
 import { CalculationResult } from '@/types';
@@ -11,6 +14,8 @@ import { Market, formatMoney } from '@/config/markets';
 import { LightLayer } from '@/lib/lightingZones';
 import { SpecGuidance, PenlabsProduct } from '@/lib/productRecommendations';
 import { CostEstimate } from '@/lib/costEstimator';
+
+type Pt = { x: number; y: number };
 
 export type LightingReportData = {
   roomName: string;
@@ -22,7 +27,40 @@ export type LightingReportData = {
   products: PenlabsProduct[];
   cost: CostEstimate;
   fixtureRange: { low: number; high: number };
+  // Optional: the actual drawn floor plan (feet) for designer reports.
+  polygon?: Pt[];
+  fixtures?: Pt[];
 };
+
+// Scaled SVG of the drawn polygon + placed fixtures.
+function PolygonPlan({ polygon, fixtures }: { polygon: Pt[]; fixtures: Pt[] }) {
+  const W = 210;
+  const H = 160;
+  const pad = 12;
+  const xs = polygon.map((p) => p.x);
+  const ys = polygon.map((p) => p.y);
+  const minX = Math.min(...xs);
+  const minY = Math.min(...ys);
+  const w = Math.max(1, Math.max(...xs) - minX);
+  const h = Math.max(1, Math.max(...ys) - minY);
+  const scale = Math.min((W - pad * 2) / w, (H - pad * 2) / h);
+  const ox = (W - w * scale) / 2 - minX * scale;
+  const oy = (H - h * scale) / 2 - minY * scale;
+  const map = (p: Pt) => ({ x: ox + p.x * scale, y: oy + p.y * scale });
+  const pts = polygon
+    .map(map)
+    .map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+    .join(' ');
+  return (
+    <Svg width={W} height={H}>
+      <Polygon points={pts} fill="rgba(138,150,130,0.18)" stroke="#A68966" strokeWidth={1.5} />
+      {fixtures.map((f, i) => {
+        const s = map(f);
+        return <Circle key={i} cx={s.x} cy={s.y} r={2.6} fill="#A68966" />;
+      })}
+    </Svg>
+  );
+}
 
 // Pen Homes palette
 const C = {
@@ -102,6 +140,7 @@ function Row({ label, value }: { label: string; value: string }) {
 
 function LightingReport(d: LightingReportData) {
   const { result, market } = d;
+  const hasPolygon = !!(d.polygon && d.polygon.length >= 3);
   const rows = Math.min(result.spacing.layout.rows, 8);
   const cols = Math.min(result.spacing.layout.columns, 12);
 
@@ -160,17 +199,22 @@ function LightingReport(d: LightingReportData) {
             </View>
             <View style={s.col}>
               <Text style={[s.small, { marginBottom: 4 }]}>
-                Suggested layout — {result.spacing.layout.rows} × {result.spacing.layout.columns},
-                {' '}{result.spacing.fromWall} {result.spacing.unit} from walls
+                {hasPolygon
+                  ? 'Drawn floor plan with fixture layout'
+                  : `Suggested layout — ${result.spacing.layout.rows} × ${result.spacing.layout.columns}, ${result.spacing.fromWall} ${result.spacing.unit} from walls`}
               </Text>
-              <View style={s.layoutBox}>
-                {Array.from({ length: rows }).map((_, r) => (
-                  <View key={r} style={s.layoutRow}>
-                    {Array.from({ length: cols }).map((_, c) => (
-                      <View key={c} style={s.dot} />
-                    ))}
-                  </View>
-                ))}
+              <View style={[s.layoutBox, hasPolygon ? { alignItems: 'center' } : {}]}>
+                {hasPolygon ? (
+                  <PolygonPlan polygon={d.polygon!} fixtures={d.fixtures ?? []} />
+                ) : (
+                  Array.from({ length: rows }).map((_, r) => (
+                    <View key={r} style={s.layoutRow}>
+                      {Array.from({ length: cols }).map((_, c) => (
+                        <View key={c} style={s.dot} />
+                      ))}
+                    </View>
+                  ))
+                )}
               </View>
             </View>
           </View>

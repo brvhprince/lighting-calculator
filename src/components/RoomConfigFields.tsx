@@ -2,10 +2,28 @@
 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { ROOM_TYPES } from '@/lib/roomTypes';
 import { FIXTURE_SIZES } from '@/lib/fixtureTypes';
-import { NaturalLightLevel, UnitSystem, RoomConfigValue } from '@/types';
+import { NaturalLightLevel, UnitSystem, RoomConfigValue, FixtureCategory } from '@/types';
+
+const FIXTURE_CATEGORY_LABELS: Record<FixtureCategory, string> = {
+  recessed: 'Recessed downlights',
+  pendant: 'Pendants',
+  track: 'Track',
+  linear: 'Linear / surface',
+  sconce: 'Wall sconces',
+  strip: 'LED strip',
+};
+const FIXTURE_CATEGORY_ORDER: FixtureCategory[] = ['recessed', 'pendant', 'track', 'linear', 'sconce', 'strip'];
 import { ArrowUpDown } from 'lucide-react';
 
 export type { RoomConfigValue };
@@ -187,12 +205,21 @@ export function RoomConfigFields({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="auto">Auto-select based on room</SelectItem>
-              {Object.entries(FIXTURE_SIZES).map(([key, fixture]) => (
-                <SelectItem key={key} value={key}>
-                  {fixture.name} ({fixture.typicalLumens.recommended} lumens typical)
-                </SelectItem>
-              ))}
+              <SelectItem value="auto">Auto-select (recessed)</SelectItem>
+              {FIXTURE_CATEGORY_ORDER.map((cat) => {
+                const items = Object.entries(FIXTURE_SIZES).filter(([, f]) => f.category === cat);
+                if (!items.length) return null;
+                return (
+                  <SelectGroup key={cat}>
+                    <SelectLabel>{FIXTURE_CATEGORY_LABELS[cat]}</SelectLabel>
+                    {items.map(([key, fixture]) => (
+                      <SelectItem key={key} value={key}>
+                        {fixture.name} ({fixture.typicalLumens.recommended} lm)
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                );
+              })}
             </SelectContent>
           </Select>
         </div>

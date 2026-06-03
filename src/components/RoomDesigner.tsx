@@ -1139,6 +1139,8 @@ export default function RoomDesigner() {
                 result={designed.result}
                 roomType={config.roomType}
                 customRoomName={config.roomType === 'other' ? config.customRoomName : undefined}
+                polygon={points}
+                fixtures={designed.fixtures}
               />
               <Button onClick={handleSave} className="gap-2">
                 <Save className="h-4 w-4" />

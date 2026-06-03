@@ -26,12 +26,17 @@ export type RoomType = {
     recommended: number;
   };
   description?: string;
+  // IES-style maintained illuminance target on the work plane, in lux.
+  targetLux?: number;
 };
+
+export type FixtureCategory = 'recessed' | 'pendant' | 'track' | 'linear' | 'sconce' | 'strip';
 
 export type FixtureSize = {
   name: string;
-  diameter: number; // in inches
-  diameterMm: number; // in mm
+  category: FixtureCategory;
+  diameter?: number; // inches (recessed only)
+  diameterMm?: number; // mm (recessed only)
   typicalLumens: {
     min: number;
     max: number;
@@ -90,6 +95,7 @@ export type CalculationResult = {
   // Fixture calculations
   numberOfFixtures: number;
   fixtureSize: string;
+  fixtureCategory?: FixtureCategory;
 
   // Spacing calculations
   spacing: {

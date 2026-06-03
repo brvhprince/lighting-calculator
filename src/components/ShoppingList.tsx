@@ -16,6 +16,7 @@ type ShoppingListProps = {
 export function ShoppingList({ result, roomType, customRoomName }: ShoppingListProps) {
   const roomName = customRoomName || ROOM_TYPES[roomType]?.name || 'Room';
   const { market, format } = useCurrency();
+  const isRecessed = (result.fixtureCategory ?? 'recessed') === 'recessed';
 
   const handlePrint = () => {
     window.print();
@@ -73,14 +74,15 @@ export function ShoppingList({ result, roomType, customRoomName }: ShoppingListP
               <input type="checkbox" className="mt-1 print:scale-150" />
               <div className="flex-1">
                 <p className="font-medium">
-                  {result.numberOfFixtures}× {result.fixtureSize} LED Recessed Lights
+                  {result.numberOfFixtures}× {result.fixtureSize}
+                  {isRecessed ? ' LED recessed lights' : ' LED fixtures'}
                 </p>
                 <ul className="text-sm text-muted-foreground space-y-1 mt-2 ml-4 list-disc">
                   <li>Minimum {result.lumensPerFixture} lumens per fixture</li>
                   <li>Total lumens needed: {result.totalLumensNeeded.toLocaleString()}</li>
                   <li>Recommended: 3000K color temperature (warm white)</li>
                   <li>Dimmable preferred</li>
-                  <li>IC-rated if near insulation</li>
+                  {isRecessed && <li>IC-rated if near insulation</li>}
                 </ul>
               </div>
             </div>
@@ -135,12 +137,12 @@ export function ShoppingList({ result, roomType, customRoomName }: ShoppingListP
             <Check className="h-4 w-4" /> Tools Needed
           </h3>
           <div className="space-y-2">
-            <div className="flex items-start gap-3">
-              <input type="checkbox" className="mt-1" />
-              <p className="text-sm">
-                Hole saw ({result.fixtureSize} for this fixture size)
-              </p>
-            </div>
+            {isRecessed && (
+              <div className="flex items-start gap-3">
+                <input type="checkbox" className="mt-1" />
+                <p className="text-sm">Hole saw ({result.fixtureSize} cut-out)</p>
+              </div>
+            )}
             <div className="flex items-start gap-3">
               <input type="checkbox" className="mt-1" />
               <p className="text-sm">Stud finder</p>

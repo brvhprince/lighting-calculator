@@ -5,7 +5,7 @@ import { SITE_URL } from '@/lib/site';
 // (the lead is still stored). Set a verified sender in LEAD_FROM_EMAIL and an
 // internal recipient in LEAD_NOTIFY_EMAIL.
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
-const FROM = process.env.LEAD_FROM_EMAIL || 'Pen Homes <hello@mail.pen.homes>';
+const FROM = process.env.LEAD_FROM_EMAIL || 'Pen Homes <hello@pen.homes>';
 const NOTIFY_TO = process.env.LEAD_NOTIFY_EMAIL || '';
 const REPLY_TO = process.env.LEAD_REPLY_TO || 'hello@pen.homes';
 // Optional booking link (e.g. a Cal.com URL); shown as a CTA when set.

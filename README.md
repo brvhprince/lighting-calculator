@@ -41,15 +41,14 @@ USD / GHS). At runtime those defaults are **overridden by values saved in the da
 | `ADMIN_PASSCODE` | Passcode for `/admin` (defaults to `penlabs` if unset) |
 | `NEXT_PUBLIC_SITE_URL` | Canonical site URL for metadata/OG/sitemap (defaults to `https://lighting.pen.homes`) |
 | `RESEND_API_KEY` | Resend key for quote emails (optional — email is skipped if unset) |
-| `LEAD_FROM_EMAIL` | Verified sender (defaults to `Pen Homes <hello@mail.pen.homes>`) |
+| `LEAD_FROM_EMAIL` | Verified sender (defaults to `Pen Homes <hello@pen.homes>`) |
 | `LEAD_REPLY_TO` | Reply-to for customer auto-replies (defaults to `hello@pen.homes`) |
 | `LEAD_NOTIFY_EMAIL` | Internal recipient for new-lead notifications (optional) |
 | `LEAD_CONSULT_URL` | Booking link (e.g. Cal.com) — adds a "Book a consultation" email CTA when set |
 | `NEXT_PUBLIC_PENCASA_URL` | Pencasa store URL — shows a "Shop at Pencasa" CTA (app + email) when set |
 
-> **Resend setup:** verify the **`mail.pen.homes`** subdomain in Resend (add the SPF/DKIM/DMARC
-> records) so emails send from `hello@mail.pen.homes` with replies routed to `hello@pen.homes`.
-> Sending from a subdomain protects the root domain's email reputation.
+> **Resend setup:** verify the **`pen.homes`** domain in Resend (add the SPF/DKIM/DMARC records) so
+> emails send from `hello@pen.homes`.
 >
 > **Click tracking:** `links.pen.homes` (CNAME → `links1.resend-dns.com`) is Resend's tracking domain.
 > Enable **click & open tracking** for the sending domain in the Resend dashboard and Resend rewrites

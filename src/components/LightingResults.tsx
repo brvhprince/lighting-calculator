@@ -4,6 +4,7 @@ import { ReactNode } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Lightbulb, Ruler } from 'lucide-react';
 import { CalculationResult } from '@/types';
+import { IlluminanceCheck } from './IlluminanceCheck';
 import { LightingZones } from './LightingZones';
 import { CircuitPlan } from './CircuitPlan';
 import { CostEnergyEstimator } from './CostEnergyEstimator';
@@ -97,6 +98,7 @@ export function LightingResults({ result, roomType, customRoomName, source = 'ca
         </CardContent>
       </Card>
 
+      <IlluminanceCheck result={result} roomType={roomType} />
       <LightingZones roomType={roomType} totalLumens={result.totalLumensNeeded} />
       <CircuitPlan result={result} roomType={roomType} />
       <CostEnergyEstimator result={result} />

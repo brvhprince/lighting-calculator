@@ -12,6 +12,8 @@ export function gatherLightingReportData(args: {
   roomType: string;
   roomName: string;
   market: Market;
+  polygon?: { x: number; y: number }[];
+  fixtures?: { x: number; y: number }[];
 }): LightingReportData {
   const ceilingFt = args.result.ceilingHeightFt ?? 8;
   return {
@@ -24,5 +26,7 @@ export function gatherLightingReportData(args: {
     products: getPenlabsProducts(args.roomType, ceilingFt),
     cost: estimateCost(args.result, costInputsFromMarket(args.market)),
     fixtureRange: fixtureCostRange(args.result.numberOfFixtures, args.market),
+    polygon: args.polygon,
+    fixtures: args.fixtures,
   };
 }

@@ -12,9 +12,12 @@ type PDFExportProps = {
   result: CalculationResult;
   roomType: string;
   customRoomName?: string;
+  // Designer passes the drawn shape so the PDF shows the real floor plan.
+  polygon?: { x: number; y: number }[];
+  fixtures?: { x: number; y: number }[];
 };
 
-export function PDFExport({ result, roomType, customRoomName }: PDFExportProps) {
+export function PDFExport({ result, roomType, customRoomName, polygon, fixtures }: PDFExportProps) {
   const { market } = useCurrency();
   const [busy, setBusy] = useState(false);
 
@@ -26,7 +29,7 @@ export function PDFExport({ result, roomType, customRoomName }: PDFExportProps) 
       // react-pdf is heavy — load it (and the document) only on demand.
       const { buildLightingReportBlob } = await import('@/lib/pdf/lightingReport');
       const blob = await buildLightingReportBlob(
-        gatherLightingReportData({ result, roomType, roomName, market })
+        gatherLightingReportData({ result, roomType, roomName, market, polygon, fixtures })
       );
 
       const url = URL.createObjectURL(blob);
