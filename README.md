@@ -46,6 +46,8 @@ USD / GHS). At runtime those defaults are **overridden by values saved in the da
 | `LEAD_NOTIFY_EMAIL` | Internal recipient for new-lead notifications (optional) |
 | `LEAD_CONSULT_URL` | Booking link (e.g. Cal.com) — adds a "Book a consultation" email CTA when set |
 | `NEXT_PUBLIC_PENCASA_URL` | Pencasa store URL — shows a "Shop at Pencasa" CTA (app + email) when set |
+| `NEXT_PUBLIC_UMAMI_SRC` | Self-hosted Umami script URL (e.g. `https://analytics.pen.homes/script.js`) |
+| `NEXT_PUBLIC_UMAMI_WEBSITE_ID` | Umami website id — both must be set to enable cookieless analytics |
 
 > **Resend setup:** verify the **`pen.homes`** domain in Resend (add the SPF/DKIM/DMARC records) so
 > emails send from `hello@pen.homes`.
@@ -54,6 +56,9 @@ USD / GHS). At runtime those defaults are **overridden by values saved in the da
 > Enable **click & open tracking** for the sending domain in the Resend dashboard and Resend rewrites
 > email links through it automatically. The email CTAs are UTM-tagged so your web analytics also
 > attributes the landings.
+
+Analytics is self-hosted **Umami** (cookieless). See [`docs/ANALYTICS.md`](docs/ANALYTICS.md) for the
+full event cheat-sheet and recommended conversion goals.
 
 #### Database setup (one-time)
 

@@ -30,10 +30,19 @@ export type LightingReportData = {
   // Optional: the actual drawn floor plan (feet) for designer reports.
   polygon?: Pt[];
   fixtures?: Pt[];
+  beamRadiusFt?: number; // beam light-pool radius at the floor
 };
 
-// Scaled SVG of the drawn polygon + placed fixtures.
-function PolygonPlan({ polygon, fixtures }: { polygon: Pt[]; fixtures: Pt[] }) {
+// Scaled SVG of the drawn polygon + placed fixtures (+ beam coverage pools).
+function PolygonPlan({
+  polygon,
+  fixtures,
+  beamRadiusFt,
+}: {
+  polygon: Pt[];
+  fixtures: Pt[];
+  beamRadiusFt?: number;
+}) {
   const W = 210;
   const H = 160;
   const pad = 12;
@@ -51,9 +60,29 @@ function PolygonPlan({ polygon, fixtures }: { polygon: Pt[]; fixtures: Pt[] }) {
     .map(map)
     .map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)
     .join(' ');
+  const poolR = beamRadiusFt && beamRadiusFt > 0 ? beamRadiusFt * scale : 0;
   return (
     <Svg width={W} height={H}>
-      <Polygon points={pts} fill="rgba(138,150,130,0.18)" stroke="#A68966" strokeWidth={1.5} />
+      {/* Beam coverage pools (behind the plan) */}
+      {poolR > 0 &&
+        fixtures.map((f, i) => {
+          const s = map(f);
+          return (
+            <Circle
+              key={`pool-${i}`}
+              cx={s.x}
+              cy={s.y}
+              r={poolR}
+              fill="#A68966"
+              fillOpacity={0.16}
+              stroke="#A68966"
+              strokeOpacity={0.5}
+              strokeWidth={0.5}
+              strokeDasharray="2 2"
+            />
+          );
+        })}
+      <Polygon points={pts} fill="rgba(138,150,130,0.14)" stroke="#A68966" strokeWidth={1.5} />
       {fixtures.map((f, i) => {
         const s = map(f);
         return <Circle key={i} cx={s.x} cy={s.y} r={2.6} fill="#A68966" />;
@@ -205,7 +234,7 @@ function LightingReport(d: LightingReportData) {
               </Text>
               <View style={[s.layoutBox, hasPolygon ? { alignItems: 'center' } : {}]}>
                 {hasPolygon ? (
-                  <PolygonPlan polygon={d.polygon!} fixtures={d.fixtures ?? []} />
+                  <PolygonPlan polygon={d.polygon!} fixtures={d.fixtures ?? []} beamRadiusFt={d.beamRadiusFt} />
                 ) : (
                   Array.from({ length: rows }).map((_, r) => (
                     <View key={r} style={s.layoutRow}>

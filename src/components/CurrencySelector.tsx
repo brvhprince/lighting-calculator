@@ -3,11 +3,18 @@
 import { useCurrency } from '@/context/CurrencyProvider';
 import { CurrencyCode, MARKETS } from '@/config/markets';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { track } from '@/lib/analytics';
 
 export function CurrencySelector() {
   const { currency, setCurrency } = useCurrency();
   return (
-    <Select value={currency} onValueChange={(v) => setCurrency(v as CurrencyCode)}>
+    <Select
+      value={currency}
+      onValueChange={(v) => {
+        setCurrency(v as CurrencyCode);
+        track('currency_change', { currency: v });
+      }}
+    >
       <SelectTrigger className="h-9 w-[88px]" aria-label="Currency">
         <SelectValue />
       </SelectTrigger>

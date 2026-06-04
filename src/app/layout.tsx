@@ -7,6 +7,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { CurrencyProvider } from "@/context/CurrencyProvider";
 import { CurrencySelector } from "@/components/CurrencySelector";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
+import { Analytics } from "@/components/Analytics";
 import { SITE_URL } from "@/lib/site";
 
 const inter = Inter({
@@ -71,6 +72,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning className={`${inter.variable} ${playfair.variable}`}>
       <body className="font-sans antialiased">
+        <Analytics />
         <ServiceWorkerRegister />
         <ThemeProvider>
         <CurrencyProvider>

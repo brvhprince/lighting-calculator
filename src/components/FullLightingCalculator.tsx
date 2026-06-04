@@ -13,6 +13,7 @@ import { ROOM_PRESETS, presetDimensions, RoomPreset } from '@/lib/roomPresets';
 import { calculateLighting, dimToFeet } from '@/lib/calculator';
 import { rectangleShape } from '@/lib/geometry';
 import { resolveCustomLumensPerSqFt } from '@/lib/roomConfig';
+import { track } from '@/lib/analytics';
 import { CalculationInput, CalculationResult, UnitSystem, RoomConfigValue } from '@/types';
 import { SavedCalculations } from './SavedCalculations';
 import { SavedCalculation } from '@/types/saved-calculations';
@@ -121,6 +122,7 @@ export default function FullLightingCalculator() {
       config: { ...config, roomType: config.roomType || 'livingRoom' },
       points: rectangleShape(wFt, lFt),
     };
+    track('open_in_designer', { room: config.roomType });
     router.push(buildDesignerUrl(state));
   };
 
@@ -136,6 +138,7 @@ export default function FullLightingCalculator() {
     }
 
     setResult(calculateLighting(buildInput()));
+    track('calculate', { room: config.roomType, unit: unitSystem });
   };
 
   const handleSave = () => {

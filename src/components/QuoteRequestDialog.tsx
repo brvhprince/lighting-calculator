@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { CalculationResult } from '@/types';
 import { useCurrency } from '@/context/CurrencyProvider';
 import { gatherLightingReportData } from '@/lib/pdf/reportData';
+import { track } from '@/lib/analytics';
 import { MailCheck, Send, AlertTriangle } from 'lucide-react';
 
 type Props = {
@@ -86,6 +87,7 @@ export function QuoteRequestDialog({ result, roomType, roomName, source }: Props
       });
       if (res.ok) {
         setState('done');
+        track('quote_submitted', { source, room: roomName });
       } else {
         const d = await res.json().catch(() => ({}));
         setError(d?.error || 'Something went wrong.');

@@ -31,20 +31,7 @@ export type Market = {
 };
 
 export const MARKETS: Record<CurrencyCode, Market> = {
-  USD: {
-    code: 'USD',
-    label: 'International (USD)',
-    locale: 'en-US',
-    symbol: '$',
-    fixtureUnitPrice: 35,
-    hardwareCost: 80,
-    installCostPerFixture: 90,
-    electricityRate: 0.17,
-    fixturePriceLow: 20,
-    fixturePriceHigh: 50,
-    hardwareLow: 40,
-    hardwareHigh: 100,
-  },
+
   // TODO: verify all GHS figures against current Ghana market + ECG/PURC tariffs.
   GHS: {
     code: 'GHS',
@@ -60,9 +47,23 @@ export const MARKETS: Record<CurrencyCode, Market> = {
     hardwareLow: 500,
     hardwareHigh: 1300,
   },
+  USD: {
+    code: 'USD',
+    label: 'International (USD)',
+    locale: 'en-US',
+    symbol: '$',
+    fixtureUnitPrice: 35,
+    hardwareCost: 80,
+    installCostPerFixture: 90,
+    electricityRate: 0.17,
+    fixturePriceLow: 20,
+    fixturePriceHigh: 50,
+    hardwareLow: 40,
+    hardwareHigh: 100,
+  },
 };
 
-export const DEFAULT_CURRENCY: CurrencyCode = 'USD';
+export const DEFAULT_CURRENCY: CurrencyCode = 'GHS';
 
 export function getMarket(code: CurrencyCode): Market {
   return MARKETS[code] ?? MARKETS[DEFAULT_CURRENCY];

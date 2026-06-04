@@ -11,7 +11,6 @@ export default function DesignerPage() {
   return (
     <div className="max-w-6xl mx-auto">
       <div className="mb-8">
-        <p className="text-xs uppercase tracking-[0.3em] text-brand-bronze">Phase 3 · Advanced</p>
         <h1 className="font-display text-3xl mb-2 mt-1">Room Designer</h1>
         <p className="text-muted-foreground">
           Sketch any floor plan to scale — including irregular, L-shaped and T-shaped rooms — and watch the

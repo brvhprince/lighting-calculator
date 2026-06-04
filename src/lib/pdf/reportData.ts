@@ -14,6 +14,7 @@ export function gatherLightingReportData(args: {
   market: Market;
   polygon?: { x: number; y: number }[];
   fixtures?: { x: number; y: number }[];
+  beamRadiusFt?: number;
 }): LightingReportData {
   const ceilingFt = args.result.ceilingHeightFt ?? 8;
   return {
@@ -28,5 +29,6 @@ export function gatherLightingReportData(args: {
     fixtureRange: fixtureCostRange(args.result.numberOfFixtures, args.market),
     polygon: args.polygon,
     fixtures: args.fixtures,
+    beamRadiusFt: args.beamRadiusFt,
   };
 }

@@ -26,6 +26,7 @@ import {
 import { getSavedCalculations } from '@/lib/savedCalculations';
 import { useCurrency } from '@/context/CurrencyProvider';
 import { fixtureCostRange } from '@/config/markets';
+import { track } from '@/lib/analytics';
 import { Project } from '@/types/project';
 import { SavedCalculation } from '@/types/saved-calculations';
 import {
@@ -163,6 +164,7 @@ export default function ProjectManager() {
       const d = await res.json();
       if (res.ok && d.code) {
         updateProject({ ...active, shareCode: d.code, editKey: d.editKey });
+        track('project_published', { rooms: active.rooms.length });
         refresh();
       } else {
         alert(d.error || 'Could not publish the project.');

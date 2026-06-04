@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { TrackedLink } from '@/components/TrackedLink';
 import {
   Calculator,
   Lightbulb,
@@ -10,8 +11,41 @@ import {
   Layers,
   DollarSign,
   ArrowRight,
+  ArrowUpRight,
   CheckCircle,
 } from 'lucide-react';
+
+const PENCASA_URL = process.env.NEXT_PUBLIC_PENCASA_URL;
+
+const ecosystem = [
+  {
+    id: 'pen-homes',
+    name: 'Pen Homes',
+    role: 'The Architect',
+    body: 'Design-build studio fusing premium architecture with native smart-home logic — your home built with its operating system already inside.',
+    href: 'https://pen.homes',
+    cta: 'Visit Pen Homes',
+    available: true,
+  },
+  {
+    id: 'pencasa',
+    name: 'Pencasa',
+    role: 'The Shop',
+    body: 'The curated boutique for the smart products used in Pen Homes projects — chosen to the same standard.',
+    href: PENCASA_URL,
+    cta: PENCASA_URL ? 'Shop Pencasa' : 'Coming soon',
+    available: !!PENCASA_URL,
+  },
+  {
+    id: 'penlabs',
+    name: 'Penlabs',
+    role: 'The Lab',
+    body: 'The lighting hardware we manufacture when nothing off-the-shelf meets the standard — the fixtures this very tool specs.',
+    href: 'https://penlabs.io',
+    cta: 'Explore Penlabs',
+    available: true,
+  },
+];
 
 const tools = [
   {
@@ -109,7 +143,7 @@ export default function Home() {
               <CardDescription>{tool.description}</CardDescription>
             </CardHeader>
             <CardContent className="mt-auto space-y-4">
-              <ul className="space-y-2">
+              <ul className="space-y-2 mb-2">
                 {tool.points.map((p) => (
                   <li key={p} className="flex gap-2 text-sm">
                     <CheckCircle className="h-4 w-4 shrink-0 text-brand-sage" />
@@ -125,6 +159,76 @@ export default function Home() {
             </CardContent>
           </Card>
         ))}
+      </div>
+
+      {/* Brand narrative */}
+      <div className="mx-auto max-w-5xl rounded-2xl bg-brand-basalt px-8 py-14 text-brand-bone md:px-14">
+        <p className="text-xs uppercase tracking-[0.3em] text-brand-bronze">From Code to Concrete</p>
+        <h2 className="mt-3 max-w-3xl font-display text-3xl md:text-4xl">The Architecture of Intelligence</h2>
+        <p className="mt-4 max-w-2xl text-brand-bone/80">
+          Most homes are built as static structures, with technology bolted on later. At Pen Homes we
+          build living systems — fusing high-end architectural design with native smart-home logic from the
+          first sketch. This calculator is a glimpse of that rigour, shared freely.
+        </p>
+        <div className="mt-8 grid gap-4 text-sm sm:grid-cols-3">
+          <p className="text-brand-bone/70">
+            <span className="block font-display text-lg text-brand-bone">Architects</span> think in spaces.
+          </p>
+          <p className="text-brand-bone/70">
+            <span className="block font-display text-lg text-brand-bone">Engineers</span> think in systems.
+          </p>
+          <p className="text-brand-bone/70">
+            <span className="block font-display text-lg text-brand-bone">Pen Homes</span> thinks in integrated living.
+          </p>
+        </div>
+        <div className="mt-10">
+          <TrackedLink
+            href="https://pen.homes"
+            event="brand_cta_click"
+            data={{ brand: 'pen-homes', from: 'narrative' }}
+          >
+            <Button size="lg" className="gap-2 bg-brand-bronze text-brand-bone hover:bg-brand-bronze/90">
+              Work with Pen Homes <ArrowUpRight className="h-4 w-4" />
+            </Button>
+          </TrackedLink>
+        </div>
+      </div>
+
+      {/* Ecosystem */}
+      <div className="mx-auto max-w-5xl">
+        <div className="mb-10 text-center">
+          <p className="text-xs uppercase tracking-[0.3em] text-brand-bronze">One ecosystem</p>
+          <h2 className="mt-2 font-display text-3xl">Designed, curated, and built in-house</h2>
+        </div>
+        <div className="grid gap-6 md:grid-cols-3">
+          {ecosystem.map((b) => (
+            <Card key={b.name} className="flex flex-col">
+              <CardHeader>
+                <p className="text-xs uppercase tracking-[0.2em] text-brand-bronze">{b.role}</p>
+                <CardTitle className="font-display text-2xl">{b.name}</CardTitle>
+              </CardHeader>
+              <CardContent className="mt-auto space-y-4">
+                <p className="text-sm text-muted-foreground">{b.body}</p>
+                {b.available && b.href ? (
+                  <TrackedLink
+                    href={b.href}
+                    event="brand_cta_click"
+                    data={{ brand: b.id, from: 'ecosystem' }}
+                    className="inline-flex"
+                  >
+                    <Button variant="outline" className="gap-2">
+                      {b.cta} <ArrowUpRight className="h-4 w-4" />
+                    </Button>
+                  </TrackedLink>
+                ) : (
+                  <span className="inline-block rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground">
+                    {b.cta}
+                  </span>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
 
       {/* Why */}

@@ -90,6 +90,7 @@ export default function RoomDesigner() {
   const updateConfig = (patch: Partial<RoomConfigValue>) => setConfig((c) => ({ ...c, ...patch }));
   const [saved, setSaved] = useState(false);
   const [showHeatmap, setShowHeatmap] = useState(true);
+  const [beamAngle, setBeamAngle] = useState(40); // degrees
   const [scaleRatio, setScaleRatio] = useState<'fit' | '20' | '50' | '100'>('fit');
   const [showDims, setShowDims] = useState(false);
   const [ortho, setOrtho] = useState(false);
@@ -256,6 +257,14 @@ export default function RoomDesigner() {
   }, [closed, areaSqFt, config, points, unit]);
 
   const result = designed; // canvas drawing reads fixtures/spacing from here
+
+  // Beam footprint at the floor: ⌀ = 2 · H · tan(beam/2). Radius used for coverage.
+  const ceilingFtEff =
+    config.sloped && config.ceilingPeakFt > 0
+      ? (config.ceilingFt + config.ceilingPeakFt) / 2
+      : config.ceilingFt;
+  const beamRadiusFt = Math.max(0.5, ceilingFtEff * Math.tan((beamAngle * Math.PI) / 180 / 2));
+  const beamPoolFt = beamRadiusFt * 2;
 
   // Build a CalculationInput from the drawn room's bounding box + shared config.
   const buildInputFromDesign = (): CalculationInput => {
@@ -432,21 +441,35 @@ export default function RoomDesigner() {
       ctx.stroke();
     }
 
-    // Fixtures + heatmap
+    // Fixtures + beam-angle coverage footprints
     if (result && result.fixtures.length) {
       if (showHeatmap) {
+        const radius = Math.max(beamRadiusFt * view.scale, 3);
+        // Soft pools (additive so overlaps read brighter).
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
-        const radius = Math.max(result.spacingFt * 0.85, 2) * view.scale;
         for (const f of result.fixtures) {
           const s = toScreen(f);
           const grad = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, radius);
-          grad.addColorStop(0, 'rgba(166,137,102,0.45)');
+          grad.addColorStop(0, 'rgba(166,137,102,0.40)');
+          grad.addColorStop(0.7, 'rgba(166,137,102,0.18)');
           grad.addColorStop(1, 'rgba(166,137,102,0)');
           ctx.fillStyle = grad;
           ctx.beginPath();
           ctx.arc(s.x, s.y, radius, 0, Math.PI * 2);
           ctx.fill();
+        }
+        ctx.restore();
+        // Beam-edge rings.
+        ctx.save();
+        ctx.strokeStyle = 'rgba(166,137,102,0.55)';
+        ctx.setLineDash([4, 3]);
+        ctx.lineWidth = 1;
+        for (const f of result.fixtures) {
+          const s = toScreen(f);
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, radius, 0, Math.PI * 2);
+          ctx.stroke();
         }
         ctx.restore();
       }
@@ -528,7 +551,7 @@ export default function RoomDesigner() {
     }
 
     ctx.textBaseline = 'alphabetic';
-  }, [points, closed, cursor, view, toScreen, result, showHeatmap, toDisplayLen, unitLabel, selectedEdge]);
+  }, [points, closed, cursor, view, toScreen, result, showHeatmap, beamRadiusFt, toDisplayLen, unitLabel, selectedEdge]);
 
   useEffect(() => {
     draw();
@@ -794,7 +817,7 @@ export default function RoomDesigner() {
               className="flex-1 gap-1.5 border border-border"
             >
               <Flame className={`h-4 w-4 ${showHeatmap ? 'text-brand-bronze' : ''}`} />
-              Heatmap
+              Coverage
             </Button>
             <Button
               variant={ortho ? 'default' : 'ghost'}
@@ -1066,6 +1089,28 @@ export default function RoomDesigner() {
               showAdvanced
               idPrefix="d"
             />
+
+            <div className="space-y-1.5">
+              <Label htmlFor="d-beam">Beam angle (coverage)</Label>
+              <Select value={String(beamAngle)} onValueChange={(v) => setBeamAngle(Number(v))}>
+                <SelectTrigger id="d-beam">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="15">15° — very narrow spot</SelectItem>
+                  <SelectItem value="24">24° — spot</SelectItem>
+                  <SelectItem value="36">36° — narrow flood</SelectItem>
+                  <SelectItem value="40">40° — medium flood</SelectItem>
+                  <SelectItem value="60">60° — flood</SelectItem>
+                  <SelectItem value="90">90° — wide flood</SelectItem>
+                  <SelectItem value="120">120° — very wide</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Light pool at the floor: ⌀ {toDisplayLen(beamPoolFt).toFixed(1)} {unitLabel}. Toggle
+                <span className="font-medium"> Coverage</span> to see the footprints.
+              </p>
+            </div>
           </CardContent>
         </Card>
 
@@ -1099,6 +1144,12 @@ export default function RoomDesigner() {
                 </Metric>
                 <Metric label="Avg. spacing">
                   {toDisplayLen(designed.spacingFt).toFixed(1)} {unitLabel}
+                </Metric>
+                <Metric label="Beam pool ⌀">
+                  {toDisplayLen(beamPoolFt).toFixed(1)} {unitLabel}
+                  <span className={`ml-1 text-xs ${beamPoolFt >= designed.spacingFt ? 'text-brand-sage' : 'text-brand-bronze'}`}>
+                    {beamPoolFt >= designed.spacingFt ? 'overlapping' : 'gaps'}
+                  </span>
                 </Metric>
                 {designed.result.ceilingFactor !== 1 && (
                   <Metric label="Ceiling adjustment">
@@ -1141,6 +1192,7 @@ export default function RoomDesigner() {
                 customRoomName={config.roomType === 'other' ? config.customRoomName : undefined}
                 polygon={points}
                 fixtures={designed.fixtures}
+                beamRadiusFt={showHeatmap ? beamRadiusFt : undefined}
               />
               <Button onClick={handleSave} className="gap-2">
                 <Save className="h-4 w-4" />
