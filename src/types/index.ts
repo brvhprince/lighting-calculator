@@ -32,6 +32,10 @@ export type RoomType = {
 
 export type FixtureCategory = 'recessed' | 'pendant' | 'track' | 'linear' | 'sconce' | 'strip';
 
+// The three lighting layers (layman-first labels live in the UI). See the
+// layered-lighting brief §1.
+export type LayerKey = 'ambient' | 'task' | 'accent';
+
 export type FixtureSize = {
   name: string;
   category: FixtureCategory;

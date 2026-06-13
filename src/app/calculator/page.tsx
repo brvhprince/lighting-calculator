@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import FullLightingCalculator from '@/components/FullLightingCalculator';
+import LightingCalculatorShell from '@/components/LightingCalculatorShell';
 
 export const metadata: Metadata = {
   title: 'Complete Lighting Calculator — Penlabs',
@@ -16,7 +16,7 @@ export default function CalculatorPage() {
           Calculate fixtures, lumens, and spacing for your recessed lighting project
         </p>
       </div>
-      <FullLightingCalculator />
+      <LightingCalculatorShell />
     </div>
   );
 }
