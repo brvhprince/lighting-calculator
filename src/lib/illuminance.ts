@@ -5,11 +5,46 @@
 
 const SQFT_TO_SQM = 0.092903;
 const LUX_PER_FC = 10.7639;
-const WORK_PLANE_FT = 2.5; // typical desk/counter height
-const LLF = 0.8; // light-loss factor (dirt, lumen depreciation) — typical maintained
+export const WORK_PLANE_FT = 2.5; // typical desk/counter height
+export const LLF = 0.8; // light-loss factor (dirt, lumen depreciation) — typical maintained
 
 function clamp(v: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, v));
+}
+
+// Estimated coefficient of utilisation from the room cavity ratio. Higher in
+// big, low-cavity rooms; lower as the cavity (mounting height above the work
+// plane) grows — this is the inverse-square / mounting-height effect from
+// `lighting-101-watt-lumens-candela-lux-nits.md`: light from a high ceiling
+// spreads and is lost before it reaches the floor. Real CU comes from a
+// fixture's photometric file; this is an estimate.
+export function estimateCU(args: {
+  areaSqFt: number;
+  ceilingHeightFt: number;
+  perimeterFt?: number;
+}): { cu: number; rcr: number } {
+  const hrcFt = Math.max(0.5, args.ceilingHeightFt - WORK_PLANE_FT);
+  const perimeterFt =
+    args.perimeterFt && args.perimeterFt > 0 ? args.perimeterFt : 4 * Math.sqrt(args.areaSqFt);
+  const rcr = clamp((2.5 * hrcFt * perimeterFt) / Math.max(1, args.areaSqFt), 0, 12);
+  const cu = clamp(0.82 - 0.05 * rcr, 0.35, 0.82);
+  return { cu, rcr };
+}
+
+// Lumens that must be installed over `areaSqFt` to maintain `targetLux` on the
+// work plane, given the estimated utilisation and light-loss factors. This is
+// the lumen method solved for flux: lumens = lux · area(m²) / (CU · LLF). It is
+// the denominator referenced in §2 of the layered-lighting brief.
+export function requiredLumensForLux(args: {
+  targetLux: number;
+  areaSqFt: number;
+  ceilingHeightFt: number;
+  perimeterFt?: number;
+}): number {
+  if (args.targetLux <= 0 || args.areaSqFt <= 0) return 0;
+  const areaSqM = args.areaSqFt * SQFT_TO_SQM;
+  const { cu } = estimateCU(args);
+  return (args.targetLux * areaSqM) / (cu * LLF);
 }
 
 export type IlluminanceResult = {
@@ -37,14 +72,8 @@ export function verifyIlluminance(args: {
   const installedLumens = args.numberOfFixtures * args.lumensPerFixture;
   const areaSqM = args.areaSqFt * SQFT_TO_SQM;
 
-  // Room cavity ratio: RCR = 2.5 · h_rc · perimeter / area  (h_rc = ceiling cavity
-  // above the work plane). Perimeter falls back to a square assumption.
-  const hrcFt = Math.max(0.5, args.ceilingHeightFt - WORK_PLANE_FT);
-  const perimeterFt = args.perimeterFt && args.perimeterFt > 0 ? args.perimeterFt : 4 * Math.sqrt(args.areaSqFt);
-  const rcr = clamp((2.5 * hrcFt * perimeterFt) / Math.max(1, args.areaSqFt), 0, 12);
-
-  // Estimated CU: high in big, low-cavity rooms; lower as RCR grows.
-  const cu = clamp(0.82 - 0.05 * rcr, 0.35, 0.82);
+  // Room cavity ratio + estimated CU (shared with the layered distribution).
+  const { cu, rcr } = estimateCU(args);
 
   const deliveredLux = areaSqM > 0 ? (installedLumens * cu * LLF) / areaSqM : 0;
   const deliveredFc = deliveredLux / LUX_PER_FC;
