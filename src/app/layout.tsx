@@ -135,11 +135,6 @@ export default function RootLayout({
                 <p className="text-xs text-muted-foreground">
                   © {new Date().getFullYear()} Penlabs — a Pen Homes company. Intentional, invisible technology.
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  <Link href="/admin" className="hover:text-brand-bronze transition-colors">
-                    Admin
-                  </Link>
-                </p>
               </div>
             </footer>
           </div>
