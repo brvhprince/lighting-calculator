@@ -5,8 +5,8 @@
 
 const SQFT_TO_SQM = 0.092903;
 const LUX_PER_FC = 10.7639;
-export const WORK_PLANE_FT = 2.5; // typical desk/counter height
-export const LLF = 0.8; // light-loss factor (dirt, lumen depreciation) — typical maintained
+const WORK_PLANE_FT = 2.5; // typical desk/counter height
+const LLF = 0.8; // light-loss factor (dirt, lumen depreciation) — typical maintained
 
 function clamp(v: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, v));
@@ -29,22 +29,6 @@ export function estimateCU(args: {
   const rcr = clamp((2.5 * hrcFt * perimeterFt) / Math.max(1, args.areaSqFt), 0, 12);
   const cu = clamp(0.82 - 0.05 * rcr, 0.35, 0.82);
   return { cu, rcr };
-}
-
-// Lumens that must be installed over `areaSqFt` to maintain `targetLux` on the
-// work plane, given the estimated utilisation and light-loss factors. This is
-// the lumen method solved for flux: lumens = lux · area(m²) / (CU · LLF). It is
-// the denominator referenced in §2 of the layered-lighting brief.
-export function requiredLumensForLux(args: {
-  targetLux: number;
-  areaSqFt: number;
-  ceilingHeightFt: number;
-  perimeterFt?: number;
-}): number {
-  if (args.targetLux <= 0 || args.areaSqFt <= 0) return 0;
-  const areaSqM = args.areaSqFt * SQFT_TO_SQM;
-  const { cu } = estimateCU(args);
-  return (args.targetLux * areaSqM) / (cu * LLF);
 }
 
 export type IlluminanceResult = {

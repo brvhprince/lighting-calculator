@@ -1,102 +1,53 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useRouter } from 'next/navigation';
 import { Calculator, Grid3x3, Save, Wand2, Share2, Check, Pentagon } from 'lucide-react';
 import { ROOM_TYPES } from '@/lib/roomTypes';
 import { ROOM_PRESETS, presetDimensions, RoomPreset } from '@/lib/roomPresets';
 import { calculateLighting, dimToFeet } from '@/lib/calculator';
 import { rectangleShape } from '@/lib/geometry';
-import { resolveCustomLumensPerSqFt } from '@/lib/roomConfig';
+import { buildCalculationInput } from '@/lib/roomConfig';
 import { track } from '@/lib/analytics';
-import { CalculationInput, CalculationResult, UnitSystem, RoomConfigValue } from '@/types';
-import { SavedCalculations } from './SavedCalculations';
+import { CalculationInput, CalculationResult, RoomConfigValue, UnitSystem } from '@/types';
 import { SavedCalculation } from '@/types/saved-calculations';
 import { saveCalculation, generateCalculationId } from '@/lib/savedCalculations';
 import { PDFExport } from './PDFExport';
-import { buildShareUrl, decodeInput, buildDesignerUrl, DesignerState } from '@/lib/shareUrl';
+import { buildShareUrl, buildDesignerUrl, DesignerState } from '@/lib/shareUrl';
 import { LightingResults } from './LightingResults';
-import { RoomConfigFields, defaultRoomConfig } from './RoomConfigFields';
+import { RoomInputs, SharedInputs } from './RoomInputs';
 
-export default function FullLightingCalculator() {
+type Props = {
+  shared: SharedInputs;
+  onUnitSystem: (u: UnitSystem) => void;
+  onLength: (v: string) => void;
+  onWidth: (v: string) => void;
+  onIsExpert: (v: boolean) => void;
+  onConfig: (patch: Partial<RoomConfigValue>) => void;
+  result: CalculationResult | null;
+  setResult: (r: CalculationResult | null) => void;
+};
+
+export default function FullLightingCalculator({
+  shared,
+  onUnitSystem,
+  onLength,
+  onWidth,
+  onIsExpert,
+  onConfig,
+  result,
+  setResult,
+}: Props) {
   const router = useRouter();
-  const [unitSystem, setUnitSystem] = useState<UnitSystem>('imperial');
-  const [length, setLength] = useState<string>('');
-  const [width, setWidth] = useState<string>('');
-  const [isExpert, setIsExpert] = useState(false);
-  const [config, setConfig] = useState<RoomConfigValue>(() => defaultRoomConfig());
-  const updateConfig = (patch: Partial<RoomConfigValue>) => setConfig((c) => ({ ...c, ...patch }));
-  const [result, setResult] = useState<CalculationResult | null>(null);
-  const [description, setDescription] = useState<string>('');
+  const { unitSystem, length, width, config } = shared;
+  const [description, setDescription] = useState('');
   const [shareCopied, setShareCopied] = useState(false);
 
-  // Ceiling/peak are stored in feet in config; CalculationInput expects the
-  // active unit (resolveCeiling reads metric as m, imperial as ft).
-  const ftToUnit = useCallback(
-    (ft: number) => (unitSystem === 'metric' ? ft * 0.3048 : ft),
-    [unitSystem]
-  );
-
-  const buildInput = useCallback((): CalculationInput => ({
-    length: parseFloat(length),
-    width: parseFloat(width),
-    unitSystem,
-    roomType: config.roomType,
-    isExpert,
-    ceilingHeight: config.ceilingFt ? ftToUnit(config.ceilingFt) : undefined,
-    slopedCeiling: config.sloped || undefined,
-    ceilingPeakHeight: config.sloped && config.ceilingPeakFt ? ftToUnit(config.ceilingPeakFt) : undefined,
-    naturalLight: config.naturalLight !== 'none' ? config.naturalLight : undefined,
-    customLumensPerSqFt: resolveCustomLumensPerSqFt(config),
-    fixtureSize: config.fixtureSize || undefined,
-    customFixtureLumens: config.customFixtureLumens ? parseFloat(config.customFixtureLumens) : undefined,
-  }), [length, width, unitSystem, config, isExpert, ftToUnit]);
-
-  // Apply a decoded/loaded input to the form state.
-  const applyInput = useCallback((input: CalculationInput) => {
-    setUnitSystem(input.unitSystem);
-    setLength(input.length.toString());
-    setWidth(input.width.toString());
-    setIsExpert(input.isExpert);
-    setConfig(
-      defaultRoomConfig({
-        roomType: input.roomType,
-        customRoomLumens:
-          input.roomType === 'other' && input.customLumensPerSqFt
-            ? String(input.customLumensPerSqFt)
-            : '',
-        customLumensPerSqFt:
-          input.roomType !== 'other' && input.customLumensPerSqFt
-            ? String(input.customLumensPerSqFt)
-            : '',
-        ceilingFt: input.ceilingHeight ? dimToFeet(input.ceilingHeight, input.unitSystem) : 8,
-        sloped: input.slopedCeiling ?? false,
-        ceilingPeakFt: input.ceilingPeakHeight
-          ? dimToFeet(input.ceilingPeakHeight, input.unitSystem)
-          : 0,
-        naturalLight: input.naturalLight ?? 'none',
-        fixtureSize: input.fixtureSize || '',
-        customFixtureLumens: input.customFixtureLumens?.toString() || '',
-      })
-    );
-  }, []);
-
-  // Load a shared configuration from the URL (?c=...) on first render.
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const encoded = new URLSearchParams(window.location.search).get('c');
-    if (!encoded) return;
-    const input = decodeInput(encoded);
-    if (input) {
-      applyInput(input);
-      setResult(calculateLighting(input));
-    }
-  }, [applyInput]);
+  const buildInput = useCallback((): CalculationInput => buildCalculationInput(shared), [shared]);
 
   const handleShare = async () => {
     const url = buildShareUrl(buildInput());
@@ -144,8 +95,6 @@ export default function FullLightingCalculator() {
   const handleSave = () => {
     if (!result) return;
 
-    const input = buildInput();
-
     const roomName =
       config.roomType === 'other' && config.customRoomName
         ? config.customRoomName
@@ -156,7 +105,8 @@ export default function FullLightingCalculator() {
       description: description.trim() || undefined,
       timestamp: Date.now(),
       type: 'full',
-      input,
+      mode: 'simple',
+      input: buildInput(),
       result,
     };
 
@@ -164,30 +114,16 @@ export default function FullLightingCalculator() {
     alert('Calculation saved successfully!');
   };
 
-  const handleLoad = (calculation: SavedCalculation) => {
-    if (calculation.type !== 'full') return;
-    applyInput(calculation.input as CalculationInput);
-    setResult(calculation.result as CalculationResult);
-  };
-
   const applyPreset = (preset: RoomPreset) => {
     const dims = presetDimensions(preset, unitSystem);
-    setLength(dims.length);
-    setWidth(dims.width);
-    updateConfig({ roomType: preset.roomType, ceilingFt: preset.ceilingFt });
+    onLength(dims.length);
+    onWidth(dims.width);
+    onConfig({ roomType: preset.roomType, ceilingFt: preset.ceilingFt });
     setResult(null);
-  };
-
-  const getDimensionLabel = () => {
-    return unitSystem === 'metric' ? 'millimeters (mm) or meters (m)' : 'inches or feet';
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
-        <SavedCalculations onLoad={handleLoad} />
-      </div>
-
       {/* Quick-apply room presets */}
       <Card>
         <CardHeader className="pb-3">
@@ -227,86 +163,13 @@ export default function FullLightingCalculator() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Unit System */}
-          <div className="space-y-3">
-            <Label>Measurement System</Label>
-            <RadioGroup
-              value={unitSystem}
-              onValueChange={(value) => setUnitSystem(value as UnitSystem)}
-              className="flex gap-4"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="imperial" id="imperial" />
-                <Label htmlFor="imperial" className="font-normal cursor-pointer">
-                  Imperial (ft/in)
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="metric" id="metric" />
-                <Label htmlFor="metric" className="font-normal cursor-pointer">
-                  Metric (m/mm)
-                </Label>
-              </div>
-            </RadioGroup>
-          </div>
-
-          {/* Room Dimensions */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="length">
-                Room Length <span className="text-muted-foreground text-xs">({getDimensionLabel()})</span>
-              </Label>
-              <Input
-                id="length"
-                type="number"
-                placeholder={unitSystem === 'metric' ? '3658' : '144'}
-                value={length}
-                onChange={(e) => setLength(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="width">
-                Room Width <span className="text-muted-foreground text-xs">({getDimensionLabel()})</span>
-              </Label>
-              <Input
-                id="width"
-                type="number"
-                placeholder={unitSystem === 'metric' ? '2439' : '96'}
-                value={width}
-                onChange={(e) => setWidth(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* Experience level */}
-          <div className="space-y-3">
-            <Label>Experience Level</Label>
-            <RadioGroup
-              value={isExpert ? 'expert' : 'homeowner'}
-              onValueChange={(value) => setIsExpert(value === 'expert')}
-              className="flex gap-4"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="homeowner" id="homeowner" />
-                <Label htmlFor="homeowner" className="font-normal cursor-pointer">
-                  Homeowner (Recommended defaults)
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="expert" id="expert" />
-                <Label htmlFor="expert" className="font-normal cursor-pointer">
-                  Professional (Custom values)
-                </Label>
-              </div>
-            </RadioGroup>
-          </div>
-
-          {/* Shared room configuration */}
-          <RoomConfigFields
-            value={config}
-            onChange={updateConfig}
-            unitSystem={unitSystem}
-            showAdvanced={isExpert}
+          <RoomInputs
+            value={shared}
+            onUnitSystem={onUnitSystem}
+            onLength={onLength}
+            onWidth={onWidth}
+            onIsExpert={onIsExpert}
+            onConfig={onConfig}
             idPrefix="calc"
           />
 

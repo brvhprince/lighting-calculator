@@ -18,6 +18,15 @@ export type RoomConfigValue = {
   targetLux: string; // advanced: target illuminance in lux (overrides preset)
 };
 
+// Room inputs shared by Simple and Advanced mode (and preserved across the toggle).
+export type SharedInputs = {
+  unitSystem: UnitSystem;
+  length: string;
+  width: string;
+  isExpert: boolean;
+  config: RoomConfigValue;
+};
+
 export type RoomType = {
   name: string;
   lumensPerSqFt: {
