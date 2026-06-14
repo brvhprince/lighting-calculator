@@ -77,6 +77,33 @@ export function resetFixtureCatalog(): void {
   byId = new Map(BUILTIN_FIXTURES.map((f) => [f.id, f]));
 }
 
+// Normalised JSON of the fields that define a fixture, for change detection.
+function fingerprint(f: FixtureDef): string {
+  return JSON.stringify({
+    id: f.id,
+    name: f.name,
+    category: f.category,
+    diameter: f.diameter ?? null,
+    diameterMm: f.diameterMm ?? null,
+    typicalLumens: f.typicalLumens,
+    price: f.price,
+    priceRange: f.priceRange ?? null,
+    archived: !!f.archived,
+  });
+}
+
+// Reduce a full working catalogue to just the items worth persisting: custom
+// fixtures, plus built-ins that were edited or archived. Built-ins left at their
+// defaults are omitted so future code updates to them still flow through.
+export function fixtureOverrides(items: FixtureDef[]): FixtureDef[] {
+  const builtins = new Map(BUILTIN_FIXTURES.map((f) => [f.id, f]));
+  return items.filter((item) => {
+    const base = builtins.get(item.id);
+    if (!base) return true; // custom fixture
+    return fingerprint(base) !== fingerprint(item);
+  });
+}
+
 // Full catalogue (including archived). Use getActiveFixtures() for pickers.
 export function getFixtureCatalog(): FixtureDef[] {
   return catalog;
