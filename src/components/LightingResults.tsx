@@ -1,8 +1,9 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Lightbulb, Ruler } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Lightbulb, Ruler, Send } from 'lucide-react';
 import { CalculationResult } from '@/types';
 import { IlluminanceCheck } from './IlluminanceCheck';
 import { LightingZones } from './LightingZones';
@@ -27,6 +28,22 @@ type Props = {
 // both surface identical lumens, zones, cost, product and shopping guidance.
 export function LightingResults({ result, roomType, customRoomName, source = 'calculator', visual }: Props) {
   const roomName = customRoomName || ROOM_TYPES[roomType]?.name || 'Room';
+
+  // The inline "Request a quote" CTA sits at the very bottom of a long page, so we
+  // also surface a floating action button — and hide it once the inline CTA is on
+  // screen, to avoid showing two identical buttons at once.
+  const ctaRef = useRef<HTMLDivElement>(null);
+  const [ctaVisible, setCtaVisible] = useState(false);
+  useEffect(() => {
+    const el = ctaRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const obs = new IntersectionObserver(([entry]) => setCtaVisible(entry.isIntersecting), {
+      rootMargin: '0px 0px -80px 0px',
+    });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
   return (
     <div className="space-y-6">
       <div className={visual ? 'grid gap-6 md:grid-cols-2' : ''}>
@@ -106,7 +123,7 @@ export function LightingResults({ result, roomType, customRoomName, source = 'ca
       <ShoppingList result={result} roomType={roomType} customRoomName={customRoomName} />
 
       {/* Conversion CTA */}
-      <Card className="border-brand-bronze/40 bg-brand-bronze/5 print:hidden">
+      <Card ref={ctaRef} className="border-brand-bronze/40 bg-brand-bronze/5 print:hidden">
         <CardContent className="flex flex-wrap items-center justify-between gap-4 py-5">
           <div>
             <p className="font-display text-lg">Bring this design to life with Pen Homes</p>
@@ -117,6 +134,27 @@ export function LightingResults({ result, roomType, customRoomName, source = 'ca
           <QuoteRequestDialog result={result} roomType={roomType} roomName={roomName} source={source} />
         </CardContent>
       </Card>
+
+      {/* Floating quote CTA — visible while reading the results, hidden once the
+          inline CTA above is on screen. Opens the same form directly. */}
+      <div
+        className={`fixed bottom-6 right-6 z-40 transition-all duration-300 print:hidden ${
+          ctaVisible ? 'pointer-events-none translate-y-2 opacity-0' : 'opacity-100'
+        }`}
+      >
+        <QuoteRequestDialog
+          result={result}
+          roomType={roomType}
+          roomName={roomName}
+          source={source}
+          trigger={
+            <Button size="lg" className="gap-2 rounded-full shadow-lg shadow-black/20">
+              <Send className="h-4 w-4" />
+              <span className="hidden sm:inline">Request a quote</span>
+            </Button>
+          }
+        />
+      </div>
     </div>
   );
 }

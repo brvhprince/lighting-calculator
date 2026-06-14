@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { ReactNode, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -23,6 +23,9 @@ type Props = {
   roomType: string;
   roomName: string;
   source: 'calculator' | 'designer';
+  // Optional custom trigger (e.g. a floating action button). Defaults to the
+  // standard "Request a quote" button.
+  trigger?: ReactNode;
 };
 
 function blobToBase64(blob: Blob): Promise<string> {
@@ -34,7 +37,7 @@ function blobToBase64(blob: Blob): Promise<string> {
   });
 }
 
-export function QuoteRequestDialog({ result, roomType, roomName, source }: Props) {
+export function QuoteRequestDialog({ result, roomType, roomName, source, trigger }: Props) {
   const { market } = useCurrency();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
@@ -117,10 +120,12 @@ export function QuoteRequestDialog({ result, roomType, roomName, source }: Props
       }}
     >
       <DialogTrigger asChild>
-        <Button className="gap-2">
-          <Send className="h-4 w-4" />
-          Request a quote
-        </Button>
+        {trigger ?? (
+          <Button className="gap-2">
+            <Send className="h-4 w-4" />
+            Request a quote
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="max-w-md">
         {state === 'done' ? (
