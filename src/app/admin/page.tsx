@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import AdminConfigEditor from '@/components/AdminConfigEditor';
+import AdminFixturesEditor from '@/components/AdminFixturesEditor';
 import AdminLeads from '@/components/AdminLeads';
 import { AdminGate } from '@/components/AdminGate';
 
@@ -21,6 +22,7 @@ export default function AdminPage() {
       <AdminGate>
         <div className="space-y-8">
           <AdminLeads />
+          <AdminFixturesEditor />
           <AdminConfigEditor />
         </div>
       </AdminGate>

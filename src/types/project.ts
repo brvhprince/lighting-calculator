@@ -1,3 +1,5 @@
+import { FixtureItem } from './index';
+
 export type ProjectRoom = {
   id: string;
   name: string;
@@ -6,6 +8,9 @@ export type ProjectRoom = {
   totalLumens: number;
   numberOfFixtures: number;
   fixtureSize: string;
+  // Exact fixture mix (by catalogue id) when known — drives per-fixture costing
+  // and survives catalogue edits. Absent for legacy rooms (cost falls back to count).
+  fixtureItems?: FixtureItem[];
   estCostLow: number;
   estCostHigh: number;
   addedAt: number;

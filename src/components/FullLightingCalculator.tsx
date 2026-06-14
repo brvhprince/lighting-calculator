@@ -18,6 +18,7 @@ import { SavedCalculation } from '@/types/saved-calculations';
 import { saveCalculation, generateCalculationId } from '@/lib/savedCalculations';
 import { PDFExport } from './PDFExport';
 import { buildShareUrl, buildDesignerUrl, DesignerState } from '@/lib/shareUrl';
+import { snapshotFixtures } from '@/lib/fixtureCatalog';
 import { LightingResults } from './LightingResults';
 import { RoomInputs, SharedInputs } from './RoomInputs';
 
@@ -108,6 +109,7 @@ export default function FullLightingCalculator({
       mode: 'simple',
       input: buildInput(),
       result,
+      fixtureSnapshot: snapshotFixtures((result.fixtureItems ?? []).map((i) => i.id)),
     };
 
     saveCalculation(savedCalc);

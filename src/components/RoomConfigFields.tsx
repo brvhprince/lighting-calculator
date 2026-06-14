@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ROOM_TYPES } from '@/lib/roomTypes';
-import { FIXTURE_SIZES } from '@/lib/fixtureTypes';
+import { getActiveFixtures } from '@/lib/fixtureCatalog';
 import { NaturalLightLevel, UnitSystem, RoomConfigValue, FixtureCategory } from '@/types';
 
 const FIXTURE_CATEGORY_LABELS: Record<FixtureCategory, string> = {
@@ -207,13 +207,13 @@ export function RoomConfigFields({
             <SelectContent>
               <SelectItem value="auto">Auto-select (recessed)</SelectItem>
               {FIXTURE_CATEGORY_ORDER.map((cat) => {
-                const items = Object.entries(FIXTURE_SIZES).filter(([, f]) => f.category === cat);
+                const items = getActiveFixtures().filter((f) => f.category === cat);
                 if (!items.length) return null;
                 return (
                   <SelectGroup key={cat}>
                     <SelectLabel>{FIXTURE_CATEGORY_LABELS[cat]}</SelectLabel>
-                    {items.map(([key, fixture]) => (
-                      <SelectItem key={key} value={key}>
+                    {items.map((fixture) => (
+                      <SelectItem key={fixture.id} value={fixture.id}>
                         {fixture.name} ({fixture.typicalLumens.recommended} lm)
                       </SelectItem>
                     ))}

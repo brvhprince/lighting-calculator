@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { ShoppingCart, Printer, Check } from 'lucide-react';
 import { ROOM_TYPES } from '@/lib/roomTypes';
 import { useCurrency } from '@/context/CurrencyProvider';
+import { fixturesOnlyRange } from '@/lib/pricing';
 
 type ShoppingListProps = {
   result: CalculationResult;
@@ -22,10 +23,10 @@ export function ShoppingList({ result, roomType, customRoomName }: ShoppingListP
     window.print();
   };
 
-  const fixtureEstimate = {
-    low: Math.round(result.numberOfFixtures * market.fixturePriceLow),
-    high: Math.round(result.numberOfFixtures * market.fixturePriceHigh),
-  };
+  const fixtureEstimate = fixturesOnlyRange(
+    result.fixtureItems ?? result.numberOfFixtures,
+    market.code
+  );
 
   const hardwareEstimate = {
     low: market.hardwareLow,
@@ -173,10 +174,7 @@ export function ShoppingList({ result, roomType, customRoomName }: ShoppingListP
           </h3>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span>
-                Fixtures ({result.numberOfFixtures}× at {format(market.fixturePriceLow)}–
-                {format(market.fixturePriceHigh)} each):
-              </span>
+              <span>Fixtures ({result.numberOfFixtures}× selected):</span>
               <span className="font-medium">
                 {format(fixtureEstimate.low)} – {format(fixtureEstimate.high)}
               </span>

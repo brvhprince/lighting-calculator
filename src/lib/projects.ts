@@ -1,6 +1,8 @@
 import { Project, ProjectRoom, ProjectTotals } from '@/types/project';
 import { CalculationResult } from '@/types';
 import { SavedCalculation } from '@/types/saved-calculations';
+import { CurrencyCode, Market } from '@/config/markets';
+import { roomCostRange } from './pricing';
 
 const STORAGE_KEY = 'pen-lighting-projects';
 
@@ -66,11 +68,17 @@ export function importProject(project: Project): Project {
   return fresh;
 }
 
-// Cost range mirrors the Shopping List estimate ($20–50/fixture + $40–100 hardware).
-export function roomFromCalculation(calc: SavedCalculation): ProjectRoom | null {
+// Cost range uses per-fixture catalogue pricing in the active currency, with the
+// market's per-room hardware range added.
+export function roomFromCalculation(
+  calc: SavedCalculation,
+  currency: CurrencyCode,
+  market: Market
+): ProjectRoom | null {
   if (calc.type !== 'full') return null;
   const result = calc.result as CalculationResult;
   const fixtures = result.numberOfFixtures;
+  const range = roomCostRange(result.fixtureItems, fixtures, currency, market);
   return {
     id: genId('room'),
     name: calc.description?.trim() || calc.name,
@@ -79,8 +87,9 @@ export function roomFromCalculation(calc: SavedCalculation): ProjectRoom | null 
     totalLumens: result.totalLumensNeeded,
     numberOfFixtures: fixtures,
     fixtureSize: result.fixtureSize,
-    estCostLow: fixtures * 20 + 40,
-    estCostHigh: fixtures * 50 + 100,
+    fixtureItems: result.fixtureItems,
+    estCostLow: range.low,
+    estCostHigh: range.high,
     addedAt: Date.now(),
   };
 }

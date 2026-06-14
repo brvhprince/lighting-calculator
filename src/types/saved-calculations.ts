@@ -1,4 +1,4 @@
-import { CalculationInput, CalculationResult, LayerKey } from './index';
+import { CalculationInput, CalculationResult, FixtureSnapshot, LayerKey } from './index';
 import type { DesignerState } from '@/lib/shareUrl';
 
 // Advanced (layered) selection: which layers are on, and the quantity of each
@@ -20,6 +20,9 @@ export type SavedCalculation = {
   result: CalculationResult | LumensOnlyResult;
   // Present for advanced (layered) saves — restores the layer/fixture selection.
   advanced?: AdvancedState;
+  // Snapshot of every fixture this design references, so it still renders/costs
+  // if a fixture is later edited or deleted from the catalogue.
+  fixtureSnapshot?: FixtureSnapshot[];
   // Present when saved from the Room Designer — restores the actual drawn shape.
   designer?: DesignerState;
 };

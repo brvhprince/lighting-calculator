@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { useCurrency } from '@/context/CurrencyProvider';
 import { MARKETS, MarketOverrides, validateMarkets } from '@/config/markets';
+import { fixtureRange } from '@/lib/pricing';
 import { Save, RotateCcw, Download, Upload, Check, AlertTriangle, ShieldAlert } from 'lucide-react';
 
 export default function AdminConfigEditor() {
@@ -185,8 +186,8 @@ export default function AdminConfigEditor() {
                   {sampleFixtures} fixtures + hardware:{' '}
                   <span className="font-semibold text-foreground">
                     {m.symbol}
-                    {(sampleFixtures * m.fixturePriceLow + m.hardwareLow).toLocaleString()}–{m.symbol}
-                    {(sampleFixtures * m.fixturePriceHigh + m.hardwareHigh).toLocaleString()}
+                    {fixtureRange(sampleFixtures, m.code, m).low.toLocaleString()}–{m.symbol}
+                    {fixtureRange(sampleFixtures, m.code, m).high.toLocaleString()}
                   </span>
                 </p>
                 <p className="text-muted-foreground">Electricity: {m.symbol}{m.electricityRate}/kWh</p>

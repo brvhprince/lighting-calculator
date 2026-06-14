@@ -1,3 +1,5 @@
+import type { CurrencyCode } from '@/config/markets';
+
 export type UnitSystem = 'metric' | 'imperial';
 
 export type NaturalLightLevel = 'none' | 'some' | 'ample';
@@ -45,7 +47,14 @@ export type FixtureCategory = 'recessed' | 'pendant' | 'track' | 'linear' | 'sco
 // layered-lighting brief §1.
 export type LayerKey = 'ambient' | 'task' | 'accent';
 
-export type FixtureSize = {
+// Per-currency unit price for one fixture (admin-editable; see config/markets CurrencyCode).
+export type FixturePrice = Partial<Record<CurrencyCode, number>>;
+
+// A fixture in the catalogue. `id` is the stable key that saved calculations and
+// projects reference. Built-ins live in fixtureTypes.ts; admins may add/edit/
+// archive fixtures, persisted in Setting('fixtures') and merged over the built-ins.
+export type FixtureDef = {
+  id: string;
   name: string;
   category: FixtureCategory;
   diameter?: number; // inches (recessed only)
@@ -55,6 +64,27 @@ export type FixtureSize = {
     max: number;
     recommended: number;
   };
+  price: FixturePrice; // unit price per fixture, by currency
+  priceRange?: Partial<Record<CurrencyCode, [number, number]>>; // optional shopping low/high
+  archived?: boolean; // soft-deleted: hidden from pickers, still resolvable
+  builtIn?: boolean; // seeded in code (guards permanent delete)
+};
+
+// Back-compat alias — fixtures used to be `FixtureSize` without id/price.
+export type FixtureSize = FixtureDef;
+
+// A quantity of one catalogue fixture (by id), used in result/project breakdowns.
+export type FixtureItem = { id: string; quantity: number };
+
+// A point-in-time copy of a fixture's key fields, embedded in saved calculations
+// and projects so a design still renders/costs even if the fixture is later
+// edited or deleted from the catalogue.
+export type FixtureSnapshot = {
+  id: string;
+  name: string;
+  category: FixtureCategory;
+  recommendedLumens: number;
+  price: FixturePrice;
 };
 
 export type CalculationInput = {
@@ -109,6 +139,10 @@ export type CalculationResult = {
   numberOfFixtures: number;
   fixtureSize: string;
   fixtureCategory?: FixtureCategory;
+  // Exact fixture breakdown by catalogue id (single line in Simple mode, the
+  // layer mix in Advanced). Drives per-fixture pricing; absent for custom-lumen
+  // designs (cost then falls back to a representative price).
+  fixtureItems?: FixtureItem[];
 
   // Spacing calculations
   spacing: {

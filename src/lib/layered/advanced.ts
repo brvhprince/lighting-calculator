@@ -1,5 +1,5 @@
-import { CalculationResult, FixtureCategory, LayerKey } from '@/types';
-import { FIXTURE_SIZES } from '@/lib/fixtureTypes';
+import { CalculationResult, FixtureCategory, FixtureItem, LayerKey } from '@/types';
+import { getActiveFixtures, resolveFixture } from '@/lib/fixtureCatalog';
 
 // Advanced (layered) mode keeps the SAME required-lumens budget as Simple mode
 // (room lumens/ft² × ceiling factor × daylight factor — computed by
@@ -16,7 +16,7 @@ export const LAYER_BUDGET_SHARE: Record<LayerKey, number> = {
 };
 
 // Which fixture families belong to each layer (brief §1, mapped to the existing
-// FIXTURE_SIZES categories). The user picks specific sizes within these.
+// fixture categories). The user picks specific sizes within these.
 export const LAYER_FIXTURE_CATEGORIES: Record<LayerKey, FixtureCategory[]> = {
   ambient: ['recessed', 'pendant', 'linear'],
   task: ['track', 'linear'],
@@ -68,9 +68,9 @@ export function suggestedLayerLumens(
 // Fixture presets available to a layer, each with its recommended lumens.
 export function fixturesForLayer(layer: LayerKey): { key: string; name: string; lumens: number }[] {
   const cats = LAYER_FIXTURE_CATEGORIES[layer];
-  return Object.entries(FIXTURE_SIZES)
-    .filter(([, f]) => cats.includes(f.category))
-    .map(([key, f]) => ({ key, name: f.name, lumens: f.typicalLumens.recommended }));
+  return getActiveFixtures()
+    .filter((f) => cats.includes(f.category))
+    .map((f) => ({ key: f.id, name: f.name, lumens: f.typicalLumens.recommended }));
 }
 
 // User selection: per layer, a map of fixture preset key → quantity.
@@ -85,14 +85,27 @@ export type LayerTotals = {
   lumens: number;
 };
 
-export function layerTotals(layer: LayerKey, counts: FixtureCounts): LayerTotals {
+// Resolve a fixture id to a display name + lumens. Defaults to the live catalogue;
+// restore flows pass a resolver that falls back to the saved snapshot (ghost).
+export type FixtureResolve = (id: string) => { name: string; lumens: number } | undefined;
+
+const defaultResolve: FixtureResolve = (id) => {
+  const f = resolveFixture(id);
+  return f ? { name: f.name, lumens: f.typicalLumens.recommended } : undefined;
+};
+
+export function layerTotals(
+  layer: LayerKey,
+  counts: FixtureCounts,
+  resolve: FixtureResolve = defaultResolve
+): LayerTotals {
   const map = counts[layer] || {};
   const fixtures = Object.entries(map)
     .filter(([, qty]) => qty > 0)
     .map(([key, qty]) => {
-      const f = FIXTURE_SIZES[key];
-      const lumens = f?.typicalLumens.recommended ?? 0;
-      return { key, name: f?.name ?? key, quantity: qty, lumens, subtotal: qty * lumens };
+      const r = resolve(key);
+      const lumens = r?.lumens ?? 0;
+      return { key, name: r?.name ?? key, quantity: qty, lumens, subtotal: qty * lumens };
     });
   return {
     layer,
@@ -106,14 +119,31 @@ export type AdvancedTotals = {
   perLayer: Record<LayerKey, LayerTotals>;
   achievedLumens: number;
   totalFixtures: number;
+  fixtureItems: FixtureItem[]; // combined mix across selected layers, by fixture id
 };
 
-export function computeAdvancedTotals(selectedLayers: LayerKey[], counts: FixtureCounts): AdvancedTotals {
-  const perLayer = { ambient: layerTotals('ambient', counts), task: layerTotals('task', counts), accent: layerTotals('accent', counts) };
+export function computeAdvancedTotals(
+  selectedLayers: LayerKey[],
+  counts: FixtureCounts,
+  resolve: FixtureResolve = defaultResolve
+): AdvancedTotals {
+  const perLayer = {
+    ambient: layerTotals('ambient', counts, resolve),
+    task: layerTotals('task', counts, resolve),
+    accent: layerTotals('accent', counts, resolve),
+  };
   const selected = selectedLayers;
   const achievedLumens = selected.reduce((s, l) => s + perLayer[l].lumens, 0);
   const totalFixtures = selected.reduce((s, l) => s + perLayer[l].count, 0);
-  return { perLayer, achievedLumens, totalFixtures };
+
+  // Merge identical fixture ids across layers (the same size can appear in two layers).
+  const merged = new Map<string, number>();
+  for (const l of selected) {
+    for (const f of perLayer[l].fixtures) merged.set(f.key, (merged.get(f.key) ?? 0) + f.quantity);
+  }
+  const fixtureItems: FixtureItem[] = Array.from(merged, ([id, quantity]) => ({ id, quantity }));
+
+  return { perLayer, achievedLumens, totalFixtures, fixtureItems };
 }
 
 // Build a CalculationResult that represents the chosen layered design, so the
@@ -124,9 +154,10 @@ export function synthesizeLayeredResult(args: {
   base: CalculationResult; // from calculateLighting (required budget + factors)
   achievedLumens: number;
   totalFixtures: number;
+  fixtureItems: FixtureItem[]; // the chosen layer mix (drives per-fixture cost)
   layerSummary: string; // e.g. "8× 6 inch recessed, 1× LED strip…"
 }): CalculationResult {
-  const { base, achievedLumens, totalFixtures } = args;
+  const { base, achievedLumens, totalFixtures, fixtureItems } = args;
   const lumensPerFixture = totalFixtures > 0 ? Math.round(achievedLumens / totalFixtures) : 0;
   return {
     ...base,
@@ -135,6 +166,7 @@ export function synthesizeLayeredResult(args: {
     lumensPerFixture,
     fixtureSize: 'Layered design',
     fixtureCategory: undefined,
+    fixtureItems,
     recommendations: [args.layerSummary, ...base.recommendations.slice(1)],
   };
 }

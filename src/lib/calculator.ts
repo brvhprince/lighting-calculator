@@ -1,6 +1,6 @@
-import { CalculationInput, CalculationResult, UnitSystem, FixtureSize, NaturalLightLevel } from '@/types';
+import { CalculationInput, CalculationResult, UnitSystem, FixtureDef, NaturalLightLevel } from '@/types';
 import { ROOM_TYPES } from './roomTypes';
-import { FIXTURE_SIZES } from './fixtureTypes';
+import { resolveFixture, getFixturesByCategory } from './fixtureCatalog';
 
 // Conversion constants
 const SQ_FT_TO_SQ_M = 0.092903;
@@ -38,22 +38,26 @@ export function buildLightingResult(p: AreaLightingParams): CalculationResult {
   let lumensPerFixture: number;
   let fixtureSizeName: string;
   let fixtureCategory: CalculationResult['fixtureCategory'];
+  let fixtureId: string | undefined;
   if (p.customFixtureLumens) {
     lumensPerFixture = p.customFixtureLumens;
-    const f = p.fixtureSize ? FIXTURE_SIZES[p.fixtureSize] : undefined;
+    const f = p.fixtureSize ? resolveFixture(p.fixtureSize) : undefined;
     fixtureSizeName = f?.name || 'Custom';
     fixtureCategory = f?.category;
-  } else if (p.fixtureSize && FIXTURE_SIZES[p.fixtureSize]) {
-    const fixture = FIXTURE_SIZES[p.fixtureSize];
+    fixtureId = f?.id;
+  } else if (p.fixtureSize && resolveFixture(p.fixtureSize)) {
+    const fixture = resolveFixture(p.fixtureSize)!;
     lumensPerFixture = fixture.typicalLumens.recommended;
     fixtureSizeName = fixture.name;
     fixtureCategory = fixture.category;
+    fixtureId = fixture.id;
   } else {
     const avgLumensPerFixture = totalLumensNeeded / Math.max(4, Math.ceil(p.areaInSqFt / 25));
     const selectedFixture = autoSelectFixture(avgLumensPerFixture);
     lumensPerFixture = selectedFixture.typicalLumens.recommended;
     fixtureSizeName = selectedFixture.name;
     fixtureCategory = selectedFixture.category;
+    fixtureId = selectedFixture.id;
   }
 
   const numberOfFixtures = Math.ceil(totalLumensNeeded / lumensPerFixture);
@@ -82,6 +86,7 @@ export function buildLightingResult(p: AreaLightingParams): CalculationResult {
     numberOfFixtures,
     fixtureSize: fixtureSizeName,
     fixtureCategory,
+    fixtureItems: fixtureId ? [{ id: fixtureId, quantity: numberOfFixtures }] : undefined,
     spacing,
     recommendations,
   };
@@ -213,10 +218,10 @@ function calculateArea(length: number, width: number, unitSystem: UnitSystem): n
   }
 }
 
-function autoSelectFixture(targetLumens: number): FixtureSize {
+function autoSelectFixture(targetLumens: number): FixtureDef {
   // Auto-selection stays within the recessed family; other fixture types are
   // chosen explicitly by the user.
-  const fixtures = Object.values(FIXTURE_SIZES).filter((f) => f.category === 'recessed');
+  const fixtures = getFixturesByCategory('recessed');
 
   // Find the fixture closest to target lumens
   let bestMatch = fixtures[0];

@@ -6,6 +6,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Layers,
   Sun,
   Lightbulb,
@@ -18,16 +25,18 @@ import {
   ArrowUp,
   Save,
   Share2,
+  AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ROOM_TYPES } from '@/lib/roomTypes';
 import { calculateLighting } from '@/lib/calculator';
 import { buildCalculationInput } from '@/lib/roomConfig';
 import { track } from '@/lib/analytics';
-import { CalculationResult, LayerKey, RoomConfigValue, UnitSystem } from '@/types';
+import { CalculationResult, FixtureSnapshot, LayerKey, RoomConfigValue, UnitSystem } from '@/types';
 import { AdvancedState, SavedCalculation } from '@/types/saved-calculations';
 import { saveCalculation, generateCalculationId } from '@/lib/savedCalculations';
 import { buildShareUrl } from '@/lib/shareUrl';
+import { resolveFixture, resolveFixtureOrGhost, snapshotFixtures } from '@/lib/fixtureCatalog';
 import { RoomInputs, SharedInputs } from './RoomInputs';
 import { LightingResults } from './LightingResults';
 import { PDFExport } from './PDFExport';
@@ -57,6 +66,9 @@ type Props = {
   onAdvanced: (next: AdvancedState) => void;
   result: CalculationResult | null;
   setResult: (r: CalculationResult | null) => void;
+  // Fixture snapshot from a restored save — lets discontinued fixtures still
+  // render (ghost) and be remapped.
+  snapshot?: FixtureSnapshot[];
 };
 
 type LayerView = {
@@ -69,12 +81,15 @@ type LayerView = {
   criNote: string;
 };
 
+type MissingFixture = { layer: LayerKey; id: string; name: string; quantity: number };
+
 type AdvancedView = {
   required: number;
   achieved: number;
   totalFixtures: number;
   totalFlag: Flag;
   layers: LayerView[];
+  missing: MissingFixture[];
   synthesized: CalculationResult;
 };
 
@@ -89,6 +104,7 @@ export default function AdvancedLightingCalculator({
   onAdvanced,
   result,
   setResult,
+  snapshot,
 }: Props) {
   const { length, width, unitSystem, config } = shared;
   const [description, setDescription] = useState('');
@@ -137,8 +153,24 @@ export default function AdvancedLightingCalculator({
 
     const base = calculateLighting(buildCalculationInput(shared));
     const required = base.totalLumensNeeded;
-    const totals: AdvancedTotals = computeAdvancedTotals(selectedLayers, fixtureCounts);
+    // Resolve fixtures via the live catalogue, falling back to the saved snapshot
+    // so a discontinued fixture still contributes its lumens on restore.
+    const resolve = (id: string) => {
+      const f = resolveFixtureOrGhost(id, snapshot);
+      return { name: f.name, lumens: f.typicalLumens.recommended };
+    };
+    const totals: AdvancedTotals = computeAdvancedTotals(selectedLayers, fixtureCounts, resolve);
     const suggested = suggestedLayerLumens(required, selectedLayers);
+
+    // Fixtures referenced in the selection that no longer exist in the catalogue.
+    const missing: MissingFixture[] = [];
+    for (const layer of selectedLayers) {
+      for (const [id, qty] of Object.entries(fixtureCounts[layer] || {})) {
+        if (qty > 0 && !resolveFixture(id)) {
+          missing.push({ layer, id, name: resolveFixtureOrGhost(id, snapshot).name, quantity: qty });
+        }
+      }
+    }
 
     const layers: LayerView[] = selectedLayers.map((layer) => {
       const lt = totals.perLayer[layer];
@@ -160,6 +192,7 @@ export default function AdvancedLightingCalculator({
       base,
       achievedLumens: totals.achievedLumens,
       totalFixtures: totals.totalFixtures,
+      fixtureItems: totals.fixtureItems,
       layerSummary: summaryParts.length
         ? `Layered design: ${summaryParts.join(', ')}.`
         : 'Layered design.',
@@ -171,8 +204,19 @@ export default function AdvancedLightingCalculator({
       totalFixtures: totals.totalFixtures,
       totalFlag: flagLumens(totals.achievedLumens, required),
       layers,
+      missing,
       synthesized,
     };
+  };
+
+  // Move a discontinued fixture's quantity onto a current fixture.
+  const remapFixture = (layer: LayerKey, oldId: string, newId: string) => {
+    if (!newId) return;
+    const layerMap = { ...(fixtureCounts[layer] || {}) };
+    const qty = layerMap[oldId] ?? 0;
+    delete layerMap[oldId];
+    layerMap[newId] = (layerMap[newId] ?? 0) + qty;
+    onAdvanced({ ...advanced, fixtureCounts: { ...fixtureCounts, [layer]: layerMap } });
   };
 
   // After a restore (result set by the shell) rebuild the view from the restored
@@ -216,6 +260,13 @@ export default function AdvancedLightingCalculator({
 
   const handleSave = () => {
     if (!view || !result) return;
+    const ids = (result.fixtureItems ?? []).map((i) => i.id);
+    const fresh = snapshotFixtures(ids);
+    // Keep snapshots for still-referenced fixtures that are no longer in the catalogue.
+    const carried = (snapshot ?? []).filter(
+      (s) => ids.includes(s.id) && !fresh.some((f) => f.id === s.id)
+    );
+    const fixtureSnapshot = [...fresh, ...carried];
     const roomName =
       config.roomType === 'other' && config.customRoomName
         ? config.customRoomName
@@ -230,6 +281,7 @@ export default function AdvancedLightingCalculator({
       input: buildCalculationInput(shared),
       result,
       advanced,
+      fixtureSnapshot,
     };
     saveCalculation(saved);
     alert('Layered design saved successfully!');
@@ -348,6 +400,44 @@ export default function AdvancedLightingCalculator({
 
       {view && result && (
         <>
+          {view.missing.length > 0 && (
+            <Card className="border-brand-bronze/50 bg-brand-bronze/5">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base text-brand-bronze">
+                  <AlertTriangle className="h-4 w-4" />
+                  Discontinued fixtures in this design
+                </CardTitle>
+                <CardDescription>
+                  These fixtures are no longer in the catalogue. The design still totals using the
+                  saved snapshot — pick a current replacement to keep it accurate.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {view.missing.map((m) => (
+                  <div key={`${m.layer}-${m.id}`} className="flex flex-wrap items-center gap-2 text-sm">
+                    <span className="font-medium">
+                      {m.quantity}× {m.name}
+                    </span>
+                    <span className="text-xs text-muted-foreground">({LAYER_INFO[m.layer].technical})</span>
+                    <span className="text-muted-foreground">→</span>
+                    <Select onValueChange={(v) => remapFixture(m.layer, m.id, v)}>
+                      <SelectTrigger className="h-8 w-56">
+                        <SelectValue placeholder="Replace with…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {fixturesForLayer(m.layer).map((f) => (
+                          <SelectItem key={f.key} value={f.key}>
+                            {f.name} ({f.lumens.toLocaleString()} lm)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
           <LayeredSummary view={view} />
 
           <div className="flex flex-wrap items-end justify-end gap-3">

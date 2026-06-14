@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { CurrencyProvider } from "@/context/CurrencyProvider";
+import { FixturesProvider } from "@/context/FixturesProvider";
 import { CurrencySelector } from "@/components/CurrencySelector";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { Analytics } from "@/components/Analytics";
@@ -76,6 +77,7 @@ export default function RootLayout({
         <ServiceWorkerRegister />
         <ThemeProvider>
         <CurrencyProvider>
+        <FixturesProvider>
           <div className="min-h-screen bg-background">
             <nav className="border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-50">
               <div className="container mx-auto px-4 py-4">
@@ -133,14 +135,10 @@ export default function RootLayout({
                 <p className="text-xs text-muted-foreground">
                   © {new Date().getFullYear()} Penlabs — a Pen Homes company. Intentional, invisible technology.
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  <Link href="/admin" className="hover:text-brand-bronze transition-colors">
-                    Admin
-                  </Link>
-                </p>
               </div>
             </footer>
           </div>
+        </FixturesProvider>
         </CurrencyProvider>
         </ThemeProvider>
       </body>

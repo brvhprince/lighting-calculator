@@ -1,5 +1,6 @@
 import { CalculationResult } from '@/types';
-import { Market, fixtureCostRange } from '@/config/markets';
+import { Market } from '@/config/markets';
+import { fixtureRange } from '@/lib/pricing';
 import { getLightingLayers } from '@/lib/lightingZones';
 import { getSpecGuidance, getPenlabsProducts } from '@/lib/productRecommendations';
 import { estimateCost, costInputsFromMarket } from '@/lib/costEstimator';
@@ -25,8 +26,12 @@ export function gatherLightingReportData(args: {
     layers: getLightingLayers(args.roomType, args.result.totalLumensNeeded),
     spec: getSpecGuidance(args.roomType, ceilingFt),
     products: getPenlabsProducts(args.roomType, ceilingFt),
-    cost: estimateCost(args.result, costInputsFromMarket(args.market)),
-    fixtureRange: fixtureCostRange(args.result.numberOfFixtures, args.market),
+    cost: estimateCost(args.result, costInputsFromMarket(args.market), args.market.code),
+    fixtureRange: fixtureRange(
+      args.result.fixtureItems ?? args.result.numberOfFixtures,
+      args.market.code,
+      args.market
+    ),
     polygon: args.polygon,
     fixtures: args.fixtures,
     beamRadiusFt: args.beamRadiusFt,
