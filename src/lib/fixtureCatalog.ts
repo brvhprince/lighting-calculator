@@ -1,6 +1,10 @@
-import { FixtureCategory, FixtureDef } from '@/types';
+import { FixtureCategory, FixtureDef, FixtureSnapshot } from '@/types';
 import { CurrencyCode, MARKETS } from '@/config/markets';
 import { BUILTIN_FIXTURES } from './fixtureTypes';
+
+// A fixture resolved for display: a real catalogue entry, or a `missing` ghost
+// reconstructed from a saved snapshot when the fixture no longer exists.
+export type ResolvedFixture = FixtureDef & { missing?: boolean };
 
 // Persisted shape in Setting('fixtures'). `items` is the admin's authoritative
 // catalogue (edited built-ins + additions); it is merged over the built-ins.
@@ -121,6 +125,55 @@ export function getFixturesByCategory(category: FixtureDef['category']): Fixture
 // Resolve a fixture id against the effective catalogue (live or archived).
 export function resolveFixture(id: string): FixtureDef | undefined {
   return byId.get(id);
+}
+
+// Resolve for display, falling back to a saved snapshot (then a generic ghost)
+// when the fixture is gone — so old designs never render blank or mis-priced.
+export function resolveFixtureOrGhost(
+  id: string,
+  snapshots?: FixtureSnapshot[]
+): ResolvedFixture {
+  const live = byId.get(id);
+  if (live) return live;
+  const snap = snapshots?.find((s) => s.id === id);
+  if (snap) {
+    return {
+      id,
+      name: snap.name,
+      category: snap.category,
+      typicalLumens: { min: snap.recommendedLumens, max: snap.recommendedLumens, recommended: snap.recommendedLumens },
+      price: snap.price,
+      archived: true,
+      missing: true,
+    };
+  }
+  return {
+    id,
+    name: `Discontinued fixture`,
+    category: 'recessed',
+    typicalLumens: { min: 0, max: 0, recommended: 0 },
+    price: {},
+    archived: true,
+    missing: true,
+  };
+}
+
+// Build snapshots for a set of fixture ids from the current catalogue.
+export function snapshotFixtures(ids: string[]): FixtureSnapshot[] {
+  const out: FixtureSnapshot[] = [];
+  for (const id of Array.from(new Set(ids))) {
+    const f = byId.get(id);
+    if (f) {
+      out.push({
+        id: f.id,
+        name: f.name,
+        category: f.category,
+        recommendedLumens: f.typicalLumens.recommended,
+        price: f.price,
+      });
+    }
+  }
+  return out;
 }
 
 // Unit price for a fixture in a currency, with sensible fallbacks: the requested

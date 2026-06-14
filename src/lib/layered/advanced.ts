@@ -85,14 +85,27 @@ export type LayerTotals = {
   lumens: number;
 };
 
-export function layerTotals(layer: LayerKey, counts: FixtureCounts): LayerTotals {
+// Resolve a fixture id to a display name + lumens. Defaults to the live catalogue;
+// restore flows pass a resolver that falls back to the saved snapshot (ghost).
+export type FixtureResolve = (id: string) => { name: string; lumens: number } | undefined;
+
+const defaultResolve: FixtureResolve = (id) => {
+  const f = resolveFixture(id);
+  return f ? { name: f.name, lumens: f.typicalLumens.recommended } : undefined;
+};
+
+export function layerTotals(
+  layer: LayerKey,
+  counts: FixtureCounts,
+  resolve: FixtureResolve = defaultResolve
+): LayerTotals {
   const map = counts[layer] || {};
   const fixtures = Object.entries(map)
     .filter(([, qty]) => qty > 0)
     .map(([key, qty]) => {
-      const f = resolveFixture(key);
-      const lumens = f?.typicalLumens.recommended ?? 0;
-      return { key, name: f?.name ?? key, quantity: qty, lumens, subtotal: qty * lumens };
+      const r = resolve(key);
+      const lumens = r?.lumens ?? 0;
+      return { key, name: r?.name ?? key, quantity: qty, lumens, subtotal: qty * lumens };
     });
   return {
     layer,
@@ -109,8 +122,16 @@ export type AdvancedTotals = {
   fixtureItems: FixtureItem[]; // combined mix across selected layers, by fixture id
 };
 
-export function computeAdvancedTotals(selectedLayers: LayerKey[], counts: FixtureCounts): AdvancedTotals {
-  const perLayer = { ambient: layerTotals('ambient', counts), task: layerTotals('task', counts), accent: layerTotals('accent', counts) };
+export function computeAdvancedTotals(
+  selectedLayers: LayerKey[],
+  counts: FixtureCounts,
+  resolve: FixtureResolve = defaultResolve
+): AdvancedTotals {
+  const perLayer = {
+    ambient: layerTotals('ambient', counts, resolve),
+    task: layerTotals('task', counts, resolve),
+    accent: layerTotals('accent', counts, resolve),
+  };
   const selected = selectedLayers;
   const achievedLumens = selected.reduce((s, l) => s + perLayer[l].lumens, 0);
   const totalFixtures = selected.reduce((s, l) => s + perLayer[l].count, 0);

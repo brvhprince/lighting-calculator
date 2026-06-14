@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { track } from '@/lib/analytics';
 import { calculateLighting, dimToFeet } from '@/lib/calculator';
 import { decodeInput } from '@/lib/shareUrl';
-import { CalculationInput, CalculationResult, RoomConfigValue, SharedInputs, UnitSystem } from '@/types';
+import { CalculationInput, CalculationResult, FixtureSnapshot, RoomConfigValue, SharedInputs, UnitSystem } from '@/types';
 import { AdvancedState, SavedCalculation } from '@/types/saved-calculations';
 import { defaultRoomConfig } from './RoomConfigFields';
 import { SavedCalculations } from './SavedCalculations';
@@ -35,6 +35,7 @@ export default function LightingCalculatorShell() {
   const [shared, setShared] = useState<SharedInputs>(defaultShared);
   const [advanced, setAdvanced] = useState<AdvancedState>(defaultAdvanced);
   const [result, setResult] = useState<CalculationResult | null>(null);
+  const [snapshot, setSnapshot] = useState<FixtureSnapshot[] | undefined>(undefined);
 
   const onUnitSystem = (unitSystem: UnitSystem) => setShared((s) => ({ ...s, unitSystem }));
   const onLength = (length: string) => setShared((s) => ({ ...s, length }));
@@ -97,6 +98,7 @@ export default function LightingCalculatorShell() {
     applyInput(calc.input as CalculationInput);
     const loadedMode: Mode = calc.mode === 'advanced' ? 'advanced' : 'simple';
     setAdvanced(calc.advanced ?? defaultAdvanced());
+    setSnapshot(calc.fixtureSnapshot);
     setMode(loadedMode);
     setResult(calc.result as CalculationResult);
   };
@@ -165,6 +167,7 @@ export default function LightingCalculatorShell() {
           onAdvanced={setAdvanced}
           result={result}
           setResult={setResult}
+          snapshot={snapshot}
         />
       )}
     </div>

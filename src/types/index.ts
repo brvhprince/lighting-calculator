@@ -76,6 +76,17 @@ export type FixtureSize = FixtureDef;
 // A quantity of one catalogue fixture (by id), used in result/project breakdowns.
 export type FixtureItem = { id: string; quantity: number };
 
+// A point-in-time copy of a fixture's key fields, embedded in saved calculations
+// and projects so a design still renders/costs even if the fixture is later
+// edited or deleted from the catalogue.
+export type FixtureSnapshot = {
+  id: string;
+  name: string;
+  category: FixtureCategory;
+  recommendedLumens: number;
+  price: FixturePrice;
+};
+
 export type CalculationInput = {
   // Room dimensions
   length: number;
