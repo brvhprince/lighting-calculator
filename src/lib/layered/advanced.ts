@@ -1,4 +1,4 @@
-import { CalculationResult, FixtureCategory, LayerKey } from '@/types';
+import { CalculationResult, FixtureCategory, FixtureItem, LayerKey } from '@/types';
 import { getActiveFixtures, resolveFixture } from '@/lib/fixtureCatalog';
 
 // Advanced (layered) mode keeps the SAME required-lumens budget as Simple mode
@@ -106,6 +106,7 @@ export type AdvancedTotals = {
   perLayer: Record<LayerKey, LayerTotals>;
   achievedLumens: number;
   totalFixtures: number;
+  fixtureItems: FixtureItem[]; // combined mix across selected layers, by fixture id
 };
 
 export function computeAdvancedTotals(selectedLayers: LayerKey[], counts: FixtureCounts): AdvancedTotals {
@@ -113,7 +114,15 @@ export function computeAdvancedTotals(selectedLayers: LayerKey[], counts: Fixtur
   const selected = selectedLayers;
   const achievedLumens = selected.reduce((s, l) => s + perLayer[l].lumens, 0);
   const totalFixtures = selected.reduce((s, l) => s + perLayer[l].count, 0);
-  return { perLayer, achievedLumens, totalFixtures };
+
+  // Merge identical fixture ids across layers (the same size can appear in two layers).
+  const merged = new Map<string, number>();
+  for (const l of selected) {
+    for (const f of perLayer[l].fixtures) merged.set(f.key, (merged.get(f.key) ?? 0) + f.quantity);
+  }
+  const fixtureItems: FixtureItem[] = Array.from(merged, ([id, quantity]) => ({ id, quantity }));
+
+  return { perLayer, achievedLumens, totalFixtures, fixtureItems };
 }
 
 // Build a CalculationResult that represents the chosen layered design, so the
@@ -124,9 +133,10 @@ export function synthesizeLayeredResult(args: {
   base: CalculationResult; // from calculateLighting (required budget + factors)
   achievedLumens: number;
   totalFixtures: number;
+  fixtureItems: FixtureItem[]; // the chosen layer mix (drives per-fixture cost)
   layerSummary: string; // e.g. "8× 6 inch recessed, 1× LED strip…"
 }): CalculationResult {
-  const { base, achievedLumens, totalFixtures } = args;
+  const { base, achievedLumens, totalFixtures, fixtureItems } = args;
   const lumensPerFixture = totalFixtures > 0 ? Math.round(achievedLumens / totalFixtures) : 0;
   return {
     ...base,
@@ -135,6 +145,7 @@ export function synthesizeLayeredResult(args: {
     lumensPerFixture,
     fixtureSize: 'Layered design',
     fixtureCategory: undefined,
+    fixtureItems,
     recommendations: [args.layerSummary, ...base.recommendations.slice(1)],
   };
 }

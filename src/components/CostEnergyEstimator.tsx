@@ -23,7 +23,10 @@ export function CostEnergyEstimator({ result }: Props) {
     setInputs(costInputsFromMarket(market));
   }, [market]);
 
-  const estimate = useMemo(() => estimateCost(result, inputs), [result, inputs]);
+  const estimate = useMemo(
+    () => estimateCost(result, inputs, market.code),
+    [result, inputs, market.code]
+  );
 
   const update = (patch: Partial<CostInputs>) => setInputs((prev) => ({ ...prev, ...patch }));
 
@@ -46,18 +49,9 @@ export function CostEnergyEstimator({ result }: Props) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Assumptions */}
+        {/* Assumptions. Per-fixture prices come from the fixture catalogue
+            (managed in admin); only the room-level globals are editable here. */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="fixturePrice">Price per fixture ({c})</Label>
-            <Input
-              id="fixturePrice"
-              type="number"
-              min={0}
-              value={inputs.fixtureUnitPrice}
-              onChange={numberField('fixtureUnitPrice')}
-            />
-          </div>
           <div className="space-y-2">
             <Label htmlFor="hardwareCost">Hardware &amp; wiring ({c})</Label>
             <Input

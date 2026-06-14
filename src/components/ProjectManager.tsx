@@ -25,7 +25,7 @@ import {
 } from '@/lib/projects';
 import { getSavedCalculations } from '@/lib/savedCalculations';
 import { useCurrency } from '@/context/CurrencyProvider';
-import { fixtureCostRange } from '@/config/markets';
+import { roomCostRange } from '@/lib/pricing';
 import { track } from '@/lib/analytics';
 import { Project } from '@/types/project';
 import { SavedCalculation } from '@/types/saved-calculations';
@@ -76,7 +76,7 @@ export default function ProjectManager() {
     if (!active) return { low: 0, high: 0 };
     return active.rooms.reduce(
       (acc, r) => {
-        const c = fixtureCostRange(r.numberOfFixtures, market);
+        const c = roomCostRange(r.fixtureItems, r.numberOfFixtures, market.code, market);
         return { low: acc.low + c.low, high: acc.high + c.high };
       },
       { low: 0, high: 0 }
@@ -96,7 +96,7 @@ export default function ProjectManager() {
     if (!active || !roomToAdd) return;
     const calc = saved.find((c) => c.id === roomToAdd);
     if (!calc) return;
-    const room = roomFromCalculation(calc);
+    const room = roomFromCalculation(calc, market.code, market);
     if (room) {
       addRoomToProject(active.id, room);
       setRoomToAdd('');
@@ -127,7 +127,7 @@ export default function ProjectManager() {
     setPublishing(true);
     try {
       const rooms = active.rooms.map((r) => {
-        const c = fixtureCostRange(r.numberOfFixtures, market);
+        const c = roomCostRange(r.fixtureItems, r.numberOfFixtures, market.code, market);
         return {
           name: r.name,
           areaDisplay: r.areaDisplay,
@@ -411,7 +411,7 @@ export default function ProjectManager() {
                             <td className="py-2 pr-4">{r.totalLumens.toLocaleString()}</td>
                             <td className="py-2 pr-4">
                               {(() => {
-                                const c = fixtureCostRange(r.numberOfFixtures, market);
+                                const c = roomCostRange(r.fixtureItems, r.numberOfFixtures, market.code, market);
                                 return `${format(c.low)}–${format(c.high)}`;
                               })()}
                             </td>

@@ -73,6 +73,9 @@ export type FixtureDef = {
 // Back-compat alias — fixtures used to be `FixtureSize` without id/price.
 export type FixtureSize = FixtureDef;
 
+// A quantity of one catalogue fixture (by id), used in result/project breakdowns.
+export type FixtureItem = { id: string; quantity: number };
+
 export type CalculationInput = {
   // Room dimensions
   length: number;
@@ -125,6 +128,10 @@ export type CalculationResult = {
   numberOfFixtures: number;
   fixtureSize: string;
   fixtureCategory?: FixtureCategory;
+  // Exact fixture breakdown by catalogue id (single line in Simple mode, the
+  // layer mix in Advanced). Drives per-fixture pricing; absent for custom-lumen
+  // designs (cost then falls back to a representative price).
+  fixtureItems?: FixtureItem[];
 
   // Spacing calculations
   spacing: {

@@ -38,22 +38,26 @@ export function buildLightingResult(p: AreaLightingParams): CalculationResult {
   let lumensPerFixture: number;
   let fixtureSizeName: string;
   let fixtureCategory: CalculationResult['fixtureCategory'];
+  let fixtureId: string | undefined;
   if (p.customFixtureLumens) {
     lumensPerFixture = p.customFixtureLumens;
     const f = p.fixtureSize ? resolveFixture(p.fixtureSize) : undefined;
     fixtureSizeName = f?.name || 'Custom';
     fixtureCategory = f?.category;
+    fixtureId = f?.id;
   } else if (p.fixtureSize && resolveFixture(p.fixtureSize)) {
     const fixture = resolveFixture(p.fixtureSize)!;
     lumensPerFixture = fixture.typicalLumens.recommended;
     fixtureSizeName = fixture.name;
     fixtureCategory = fixture.category;
+    fixtureId = fixture.id;
   } else {
     const avgLumensPerFixture = totalLumensNeeded / Math.max(4, Math.ceil(p.areaInSqFt / 25));
     const selectedFixture = autoSelectFixture(avgLumensPerFixture);
     lumensPerFixture = selectedFixture.typicalLumens.recommended;
     fixtureSizeName = selectedFixture.name;
     fixtureCategory = selectedFixture.category;
+    fixtureId = selectedFixture.id;
   }
 
   const numberOfFixtures = Math.ceil(totalLumensNeeded / lumensPerFixture);
@@ -82,6 +86,7 @@ export function buildLightingResult(p: AreaLightingParams): CalculationResult {
     numberOfFixtures,
     fixtureSize: fixtureSizeName,
     fixtureCategory,
+    fixtureItems: fixtureId ? [{ id: fixtureId, quantity: numberOfFixtures }] : undefined,
     spacing,
     recommendations,
   };

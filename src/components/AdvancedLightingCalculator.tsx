@@ -160,6 +160,7 @@ export default function AdvancedLightingCalculator({
       base,
       achievedLumens: totals.achievedLumens,
       totalFixtures: totals.totalFixtures,
+      fixtureItems: totals.fixtureItems,
       layerSummary: summaryParts.length
         ? `Layered design: ${summaryParts.join(', ')}.`
         : 'Layered design.',
