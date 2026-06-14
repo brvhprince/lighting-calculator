@@ -1,5 +1,39 @@
 import { LayerKey } from '@/types';
-import { RoomProfile } from './roomProfiles';
+import { RoomProfile, getRoomProfile } from './roomProfiles';
+
+// Colour-quality class for any room (the 6 profiled rooms override via
+// ROOM_PROFILES). Sources: lighting-spec-guidance-residential.md.
+const CRITICAL_ROOMS = new Set(['office']);
+const UTILITY_ROOMS = new Set([
+  'garage',
+  'laundry',
+  'basement',
+  'closet',
+  'hallway',
+  'stairway',
+  'mudRoom',
+  'outdoor',
+]);
+
+export function resolveColorQuality(roomType: string): RoomProfile['colorQuality'] {
+  const profile = getRoomProfile(roomType);
+  if (profile) return profile.colorQuality;
+  if (CRITICAL_ROOMS.has(roomType)) return 'critical';
+  if (UTILITY_ROOMS.has(roomType)) return 'utility';
+  return 'warm';
+}
+
+// Default per-layer CCT (Kelvin) by colour quality — task runs cooler, ambient
+// and accent warmer (§4b/§4d). Profiled rooms override with tuned values.
+const CCT_DEFAULTS: Record<RoomProfile['colorQuality'], Record<LayerKey, number>> = {
+  warm: { ambient: 2700, task: 3500, accent: 2700 },
+  critical: { ambient: 4000, task: 4500, accent: 3000 },
+  utility: { ambient: 4000, task: 4000, accent: 4000 },
+};
+
+export function resolveLayerCct(roomType: string, layer: LayerKey): number {
+  return getRoomProfile(roomType)?.cct[layer] ?? CCT_DEFAULTS[resolveColorQuality(roomType)][layer];
+}
 
 // CRI / R9 guidance per layer (brief §4c), sourced from color-temperature-cct-cri.md
 // (R9 ≥ 50 minimum, ≥ 90 premium; Ra ≥ 90) and lighting-spec-guidance-residential.md.

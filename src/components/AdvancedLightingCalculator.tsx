@@ -1,93 +1,249 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Layers, Sun, Lightbulb, Sparkles, Info, AlertTriangle } from 'lucide-react';
+  Layers,
+  Sun,
+  Lightbulb,
+  Sparkles,
+  Info,
+  Minus,
+  Plus,
+  Check,
+  ArrowDown,
+  ArrowUp,
+  Save,
+  Share2,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ROOM_TYPES } from '@/lib/roomTypes';
-import { dimToFeet, resolveCeiling } from '@/lib/calculator';
+import { calculateLighting } from '@/lib/calculator';
+import { buildCalculationInput } from '@/lib/roomConfig';
 import { track } from '@/lib/analytics';
-import { CalculationInput, FixtureCategory, LayerKey, UnitSystem } from '@/types';
-import { ROOM_PROFILES, hasRoomProfile, getRoomProfile } from '@/lib/layered/roomProfiles';
-import { distributeLayers, areaInUnit, LayeredResult } from '@/lib/layered/distribute';
-import { LAYER_INFO, KRUITHOF_NOTE } from '@/lib/layered/guidance';
+import { CalculationResult, LayerKey, RoomConfigValue, UnitSystem } from '@/types';
+import { AdvancedState, SavedCalculation } from '@/types/saved-calculations';
+import { saveCalculation, generateCalculationId } from '@/lib/savedCalculations';
+import { buildShareUrl } from '@/lib/shareUrl';
+import { RoomInputs, SharedInputs } from './RoomInputs';
+import { LightingResults } from './LightingResults';
+import { PDFExport } from './PDFExport';
+import {
+  fixturesForLayer,
+  computeAdvancedTotals,
+  suggestedLayerLumens,
+  flagLumens,
+  synthesizeLayeredResult,
+  Flag,
+  AdvancedTotals,
+} from '@/lib/layered/advanced';
+import { LAYER_INFO, KRUITHOF_NOTE, resolveLayerCct, layerCriNote, resolveColorQuality } from '@/lib/layered/guidance';
 import { kelvinToCss } from '@/lib/cct';
 
 const ORDERED_LAYERS: LayerKey[] = ['ambient', 'task', 'accent'];
 const LAYER_ICON: Record<LayerKey, typeof Sun> = { ambient: Sun, task: Lightbulb, accent: Sparkles };
 
-// Rooms with a layered profile (§3). Advanced mode is limited to these.
-const PROFILE_ROOMS = Object.keys(ROOM_PROFILES).filter((k) => k in ROOM_TYPES);
+type Props = {
+  shared: SharedInputs;
+  onUnitSystem: (u: UnitSystem) => void;
+  onLength: (v: string) => void;
+  onWidth: (v: string) => void;
+  onIsExpert: (v: boolean) => void;
+  onConfig: (patch: Partial<RoomConfigValue>) => void;
+  advanced: AdvancedState;
+  onAdvanced: (next: AdvancedState) => void;
+  result: CalculationResult | null;
+  setResult: (r: CalculationResult | null) => void;
+};
 
-export default function AdvancedLightingCalculator() {
-  const [unitSystem, setUnitSystem] = useState<UnitSystem>('imperial');
-  const [length, setLength] = useState('');
-  const [width, setWidth] = useState('');
-  const [ceiling, setCeiling] = useState('');
-  const [roomType, setRoomType] = useState('');
-  const [selectedLayers, setSelectedLayers] = useState<LayerKey[]>(['ambient', 'task', 'accent']);
-  const [fixtureOverride, setFixtureOverride] = useState<Partial<Record<LayerKey, FixtureCategory>>>(
-    {}
-  );
-  const [result, setResult] = useState<LayeredResult | null>(null);
+type LayerView = {
+  layer: LayerKey;
+  count: number;
+  lumens: number;
+  suggested: number;
+  flag: Flag;
+  cct: number;
+  criNote: string;
+};
 
-  const dimensionLabel = unitSystem === 'metric' ? 'mm or m' : 'inches or feet';
-  const profile = roomType ? getRoomProfile(roomType) : undefined;
+type AdvancedView = {
+  required: number;
+  achieved: number;
+  totalFixtures: number;
+  totalFlag: Flag;
+  layers: LayerView[];
+  synthesized: CalculationResult;
+};
+
+export default function AdvancedLightingCalculator({
+  shared,
+  onUnitSystem,
+  onLength,
+  onWidth,
+  onIsExpert,
+  onConfig,
+  advanced,
+  onAdvanced,
+  result,
+  setResult,
+}: Props) {
+  const { length, width, unitSystem, config } = shared;
+  const [description, setDescription] = useState('');
+  const [view, setView] = useState<AdvancedView | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
+
+  const { selectedLayers, fixtureCounts } = advanced;
 
   const toggleLayer = (layer: LayerKey) => {
-    setSelectedLayers((prev) =>
-      prev.includes(layer) ? prev.filter((l) => l !== layer) : [...prev, layer]
-    );
+    const next = selectedLayers.includes(layer)
+      ? selectedLayers.filter((l) => l !== layer)
+      : [...ORDERED_LAYERS.filter((l) => l === layer || selectedLayers.includes(l))];
+    onAdvanced({ ...advanced, selectedLayers: next });
   };
 
+  const setCount = (layer: LayerKey, key: string, qty: number) => {
+    const layerMap = { ...(fixtureCounts[layer] || {}) };
+    if (qty <= 0) delete layerMap[key];
+    else layerMap[key] = qty;
+    onAdvanced({ ...advanced, fixtureCounts: { ...fixtureCounts, [layer]: layerMap } });
+  };
+
+  const inputsValid = Boolean(length && width && config.roomType && selectedLayers.length > 0);
+
+  // Live required-lumens budget (for the per-layer "suggested" hints while picking).
+  const liveRequired = useMemo(() => {
+    if (!length || !width || !config.roomType) return 0;
+    if (config.roomType === 'other' && !config.customRoomLumens) return 0;
+    try {
+      return calculateLighting(buildCalculationInput(shared)).totalLumensNeeded;
+    } catch {
+      return 0;
+    }
+  }, [length, width, config, shared]);
+
+  const liveSuggested = useMemo(
+    () => suggestedLayerLumens(liveRequired, selectedLayers),
+    [liveRequired, selectedLayers]
+  );
+
+  // Build the full snapshot view-model from the current inputs + selection.
+  const buildView = (): AdvancedView | null => {
+    if (!length || !width || !config.roomType) return null;
+    if (config.roomType === 'other' && (!config.customRoomName || !config.customRoomLumens)) return null;
+    if (selectedLayers.length === 0) return null;
+
+    const base = calculateLighting(buildCalculationInput(shared));
+    const required = base.totalLumensNeeded;
+    const totals: AdvancedTotals = computeAdvancedTotals(selectedLayers, fixtureCounts);
+    const suggested = suggestedLayerLumens(required, selectedLayers);
+
+    const layers: LayerView[] = selectedLayers.map((layer) => {
+      const lt = totals.perLayer[layer];
+      return {
+        layer,
+        count: lt.count,
+        lumens: lt.lumens,
+        suggested: suggested[layer],
+        flag: flagLumens(lt.lumens, suggested[layer]),
+        cct: resolveLayerCct(config.roomType, layer),
+        criNote: layerCriNote(layer, resolveColorQuality(config.roomType)),
+      };
+    });
+
+    const summaryParts = selectedLayers.flatMap((layer) =>
+      totals.perLayer[layer].fixtures.map((f) => `${f.quantity}× ${f.name}`)
+    );
+    const synthesized = synthesizeLayeredResult({
+      base,
+      achievedLumens: totals.achievedLumens,
+      totalFixtures: totals.totalFixtures,
+      layerSummary: summaryParts.length
+        ? `Layered design: ${summaryParts.join(', ')}.`
+        : 'Layered design.',
+    });
+
+    return {
+      required,
+      achieved: totals.achievedLumens,
+      totalFixtures: totals.totalFixtures,
+      totalFlag: flagLumens(totals.achievedLumens, required),
+      layers,
+      synthesized,
+    };
+  };
+
+  // After a restore (result set by the shell) rebuild the view from the restored
+  // inputs, which were set together with the result.
+  useEffect(() => {
+    if (result && !view) {
+      const v = buildView();
+      if (v) setView(v);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result]);
+
   const handleCalculate = () => {
-    if (!length || !width || !roomType) {
-      alert('Please enter room dimensions and select a room type');
+    if (!length || !width || !config.roomType) {
+      alert('Please fill in room dimensions and select a room type');
       return;
     }
-    const activeProfile = getRoomProfile(roomType);
-    if (!activeProfile) {
-      alert('This room does not have a layered profile yet.');
+    if (config.roomType === 'other' && (!config.customRoomName || !config.customRoomLumens)) {
+      alert('Please enter a room name and lumens per square foot for custom room type');
       return;
     }
     if (selectedLayers.length === 0) {
       alert('Select at least one lighting layer');
       return;
     }
+    const v = buildView();
+    if (!v) return;
+    if (v.totalFixtures === 0) {
+      alert('Add at least one fixture to a layer using the + steppers');
+      return;
+    }
+    setView(v);
+    setResult(v.synthesized);
+    track('calculate_layered', {
+      room: config.roomType,
+      unit: unitSystem,
+      layers: selectedLayers.join('+'),
+      fixtures: v.totalFixtures,
+    });
+  };
 
-    // Floor area in ft² (mirrors the existing calculator's unit handling).
-    const lFt = dimToFeet(parseFloat(length), unitSystem);
-    const wFt = dimToFeet(parseFloat(width), unitSystem);
-    const areaSqFt = lFt * wFt;
-    const ceilingHeightFt = resolveCeiling(
-      ceiling ? parseFloat(ceiling) : undefined,
-      unitSystem
-    );
+  const handleSave = () => {
+    if (!view || !result) return;
+    const roomName =
+      config.roomType === 'other' && config.customRoomName
+        ? config.customRoomName
+        : ROOM_TYPES[config.roomType]?.name || 'Room';
+    const saved: SavedCalculation = {
+      id: generateCalculationId(),
+      name: `${roomName} (layered) - ${result.area.toFixed(0)} ${result.areaUnit}`,
+      description: description.trim() || undefined,
+      timestamp: Date.now(),
+      type: 'full',
+      mode: 'advanced',
+      input: buildCalculationInput(shared),
+      result,
+      advanced,
+    };
+    saveCalculation(saved);
+    alert('Layered design saved successfully!');
+  };
 
-    // Order layers canonically so ambient is computed before task (task subtracts
-    // the ambient baseline — see distributeLayers).
-    const layers = ORDERED_LAYERS.filter((l) => selectedLayers.includes(l));
-
-    setResult(
-      distributeLayers({
-        profile: activeProfile,
-        areaSqFt,
-        ceilingHeightFt,
-        selection: { layers, fixtureOverride },
-      })
-    );
-    track('calculate_layered', { room: roomType, unit: unitSystem, layers: layers.join('+') });
+  const handleShare = async () => {
+    const url = buildShareUrl(buildCalculationInput(shared));
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    } catch {
+      window.prompt('Copy this share link:', url);
+    }
   };
 
   return (
@@ -99,101 +255,34 @@ export default function AdvancedLightingCalculator() {
             Layered Lighting Designer
           </CardTitle>
           <CardDescription>
-            Design a room in layers — ceiling, task and mood lighting. Each layer is sized for its
-            own share of the room&apos;s light, so the result is correctly lit rather than
-            triple-lit.
+            Everything the simple calculator does, plus lighting layers. We compute the room&apos;s
+            required lumens (room type, ceiling height and daylight included), then you choose the
+            fixtures per layer and we check your design against that budget.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Unit System */}
-          <div className="space-y-3">
-            <Label>Measurement System</Label>
-            <RadioGroup
-              value={unitSystem}
-              onValueChange={(value) => setUnitSystem(value as UnitSystem)}
-              className="flex gap-4"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="imperial" id="adv-imperial" />
-                <Label htmlFor="adv-imperial" className="font-normal cursor-pointer">
-                  Imperial (ft/in)
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="metric" id="adv-metric" />
-                <Label htmlFor="adv-metric" className="font-normal cursor-pointer">
-                  Metric (m/mm)
-                </Label>
-              </div>
-            </RadioGroup>
-          </div>
+          <RoomInputs
+            value={shared}
+            onUnitSystem={onUnitSystem}
+            onLength={onLength}
+            onWidth={onWidth}
+            onIsExpert={onIsExpert}
+            onConfig={onConfig}
+            idPrefix="adv"
+            showFixture={false}
+          />
 
-          {/* Room type — limited to rooms with a layered profile */}
-          <div className="space-y-2">
-            <Label htmlFor="adv-room">Room Type</Label>
-            <Select
-              value={roomType}
-              onValueChange={(v) => {
-                setRoomType(v);
-                setFixtureOverride({});
-                setResult(null);
-              }}
-            >
-              <SelectTrigger id="adv-room">
-                <SelectValue placeholder="Select a room" />
-              </SelectTrigger>
-              <SelectContent>
-                {PROFILE_ROOMS.map((key) => (
-                  <SelectItem key={key} value={key}>
-                    {ROOM_TYPES[key].name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Dimensions + ceiling */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="adv-length">
-                Length <span className="text-muted-foreground text-xs">({dimensionLabel})</span>
-              </Label>
-              <Input
-                id="adv-length"
-                type="number"
-                placeholder={unitSystem === 'metric' ? '3658' : '144'}
-                value={length}
-                onChange={(e) => setLength(e.target.value)}
-              />
+          {/* Live required-lumens budget */}
+          {liveRequired > 0 && (
+            <div className="rounded-lg border border-brand-bronze/40 bg-brand-bronze/5 p-3 text-sm">
+              <span className="text-muted-foreground">Required for this room: </span>
+              <span className="font-semibold">{liveRequired.toLocaleString()} lumens</span>
+              <span className="text-muted-foreground">
+                {' '}
+                — split as suggestions across the layers you pick below.
+              </span>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="adv-width">
-                Width <span className="text-muted-foreground text-xs">({dimensionLabel})</span>
-              </Label>
-              <Input
-                id="adv-width"
-                type="number"
-                placeholder={unitSystem === 'metric' ? '2439' : '96'}
-                value={width}
-                onChange={(e) => setWidth(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="adv-ceiling">
-                Ceiling height{' '}
-                <span className="text-muted-foreground text-xs">
-                  ({unitSystem === 'metric' ? 'm' : 'ft'}, optional)
-                </span>
-              </Label>
-              <Input
-                id="adv-ceiling"
-                type="number"
-                placeholder={unitSystem === 'metric' ? '2.7' : '9'}
-                value={ceiling}
-                onChange={(e) => setCeiling(e.target.value)}
-              />
-            </div>
-          </div>
+          )}
 
           {/* Layer selection */}
           <div className="space-y-3">
@@ -201,7 +290,7 @@ export default function AdvancedLightingCalculator() {
               Lighting layers
               <span
                 className="inline-flex"
-                title="Pick any combination. Ambient is the general room light; task lights work surfaces; accent adds mood. See each layer below."
+                title="Pick any combination. Ambient is the general room light; task lights work surfaces; accent adds mood."
               >
                 <Info className="h-3.5 w-3.5 text-muted-foreground" />
               </span>
@@ -237,89 +326,180 @@ export default function AdvancedLightingCalculator() {
             </div>
           </div>
 
-          {/* Optional per-layer fixture choice */}
-          {profile && selectedLayers.length > 0 && (
-            <div className="space-y-3">
-              <Label className="text-sm">Fixture per layer (optional — defaults to recommended)</Label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {ORDERED_LAYERS.filter((l) => selectedLayers.includes(l)).map((layer) => {
-                  const candidates = profile.layers[layer].fixtures;
-                  return (
-                    <div key={layer} className="space-y-1">
-                      <span className="text-xs text-muted-foreground">
-                        {LAYER_INFO[layer].technical}
-                      </span>
-                      <Select
-                        value={fixtureOverride[layer] ?? 'auto'}
-                        onValueChange={(v) =>
-                          setFixtureOverride((prev) => ({
-                            ...prev,
-                            [layer]: v === 'auto' ? undefined : (v as FixtureCategory),
-                          }))
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="auto">Auto ({candidates[0]})</SelectItem>
-                          {candidates.map((cat) => (
-                            <SelectItem key={cat} value={cat}>
-                              {cat}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          {/* Fixture pickers per selected layer */}
+          {config.roomType &&
+            ORDERED_LAYERS.filter((l) => selectedLayers.includes(l)).map((layer) => (
+              <LayerFixturePicker
+                key={layer}
+                layer={layer}
+                counts={fixtureCounts[layer] || {}}
+                suggested={liveSuggested[layer]}
+                cct={resolveLayerCct(config.roomType, layer)}
+                onCount={(key, qty) => setCount(layer, key, qty)}
+              />
+            ))}
 
-          <Button onClick={handleCalculate} className="w-full" size="lg">
+          <Button onClick={handleCalculate} className="w-full" size="lg" disabled={!inputsValid}>
             <Layers className="mr-2 h-4 w-4" />
-            Design Layers
+            Calculate Layered Design
           </Button>
         </CardContent>
       </Card>
 
-      {result && <LayeredResults result={result} unitSystem={unitSystem} />}
+      {view && result && (
+        <>
+          <LayeredSummary view={view} />
+
+          <div className="flex flex-wrap items-end justify-end gap-3">
+            <div className="min-w-[200px] flex-1 max-w-md space-y-1">
+              <Label htmlFor="description-adv" className="text-sm">
+                Description (optional)
+              </Label>
+              <Input
+                id="description-adv"
+                type="text"
+                placeholder="e.g., Kitchen layered scheme"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </div>
+            <Button onClick={handleShare} variant="outline" className="gap-2">
+              {shareCopied ? <Check className="h-4 w-4 text-brand-sage" /> : <Share2 className="h-4 w-4" />}
+              {shareCopied ? 'Link copied' : 'Share'}
+            </Button>
+            <PDFExport
+              result={result}
+              roomType={config.roomType}
+              customRoomName={config.roomType === 'other' ? config.customRoomName : undefined}
+            />
+            <Button onClick={handleSave} variant="default" className="gap-2">
+              <Save className="h-4 w-4" />
+              Save Design
+            </Button>
+          </div>
+
+          <LightingResults
+            result={result}
+            roomType={config.roomType}
+            customRoomName={config.roomType === 'other' ? config.customRoomName : undefined}
+          />
+        </>
+      )}
     </div>
   );
 }
 
-function LayeredResults({ result, unitSystem }: { result: LayeredResult; unitSystem: UnitSystem }) {
-  const roomArea = areaInUnit(result.areaSqFt, unitSystem);
+function LayerFixturePicker({
+  layer,
+  counts,
+  suggested,
+  cct,
+  onCount,
+}: {
+  layer: LayerKey;
+  counts: Record<string, number>;
+  suggested: number;
+  cct: number;
+  onCount: (key: string, qty: number) => void;
+}) {
+  const info = LAYER_INFO[layer];
+  const Icon = LAYER_ICON[layer];
+  const fixtures = fixturesForLayer(layer);
+  const subtotal = fixtures.reduce((s, f) => s + (counts[f.key] || 0) * f.lumens, 0);
+
+  return (
+    <div className="rounded-lg border border-border p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="flex items-center gap-2 text-sm font-semibold">
+          <Icon className="h-4 w-4 text-brand-bronze" />
+          {info.laymanLabel}
+          <span className="text-xs font-normal text-muted-foreground">({info.technical})</span>
+        </span>
+        <span className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span
+            className="inline-block h-3 w-3 rounded-full border border-border"
+            style={{ backgroundColor: kelvinToCss(cct) }}
+          />
+          {cct}K
+        </span>
+      </div>
+
+      <div className="space-y-2">
+        {fixtures.map((f) => {
+          const qty = counts[f.key] || 0;
+          return (
+            <div key={f.key} className="flex items-center justify-between gap-3">
+              <span className="text-sm">
+                {f.name}{' '}
+                <span className="text-xs text-muted-foreground">({f.lumens.toLocaleString()} lm)</span>
+              </span>
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => onCount(f.key, Math.max(0, qty - 1))}
+                  aria-label={`Decrease ${f.name}`}
+                >
+                  <Minus className="h-3 w-3" />
+                </Button>
+                <Input
+                  type="number"
+                  min={0}
+                  value={qty || ''}
+                  placeholder="0"
+                  onChange={(e) => onCount(f.key, Math.max(0, parseInt(e.target.value) || 0))}
+                  className="h-7 w-14 text-center"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => onCount(f.key, qty + 1)}
+                  aria-label={`Increase ${f.name}`}
+                >
+                  <Plus className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="flex justify-between border-t pt-2 text-sm">
+        <span className="text-muted-foreground">
+          Selected {subtotal.toLocaleString()} lm
+          {suggested > 0 && ` · suggested ≈ ${suggested.toLocaleString()} lm`}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function LayeredSummary({ view }: { view: AdvancedView }) {
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Room total</CardTitle>
+          <CardTitle className="text-base">Design vs. required</CardTitle>
           <CardDescription>
-            {Math.round(roomArea.value)} {roomArea.label} · {result.totalLumens.toLocaleString()}{' '}
-            lumens across {result.roomLayers.length}{' '}
-            {result.roomLayers.length === 1 ? 'layer' : 'layers'} — each layer lights its own share,
-            not the whole room.
+            Your fixtures deliver {view.achieved.toLocaleString()} lm against a required{' '}
+            {view.required.toLocaleString()} lm ({view.totalFixtures} fixtures).
           </CardDescription>
         </CardHeader>
-        {result.cctSpreadWarning && (
-          <CardContent className="pt-0">
-            <p className="flex items-start gap-2 rounded-md bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-400">
-              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              {result.cctSpreadWarning}
-            </p>
-          </CardContent>
-        )}
+        <CardContent>
+          <FlagBanner flag={view.totalFlag} unit="lm" />
+        </CardContent>
       </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {result.roomLayers.map((layer) => {
-          const info = LAYER_INFO[layer.layer];
-          const Icon = LAYER_ICON[layer.layer];
-          const zoneArea = areaInUnit(layer.areaSqFt, unitSystem);
+        {view.layers.map((lv) => {
+          const info = LAYER_INFO[lv.layer];
+          const Icon = LAYER_ICON[lv.layer];
           return (
-            <Card key={layer.layer}>
+            <Card key={lv.layer}>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Icon className="h-4 w-4 text-brand-bronze" />
@@ -327,35 +507,31 @@ function LayeredResults({ result, unitSystem }: { result: LayeredResult; unitSys
                 </CardTitle>
                 <CardDescription title={info.help}>{info.technical} layer</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3 text-sm">
+              <CardContent className="space-y-2 text-sm">
                 <div className="text-2xl font-bold">
-                  {layer.quantity}×{' '}
+                  {lv.count}{' '}
                   <span className="text-base font-medium text-muted-foreground">
-                    {layer.fixtureName}
+                    {lv.count === 1 ? 'fixture' : 'fixtures'}
                   </span>
                 </div>
-                <Row label="Lumens / fixture" value={`${layer.lumensPerFixture.toLocaleString()} lm`} />
-                <Row label="Layer total" value={`${layer.layerLumens.toLocaleString()} lm`} />
-                <Row
-                  label="Target"
-                  value={`${layer.targetLux} lx${
-                    layer.zoneLabel ? ` · ${layer.zoneLabel}` : ''
-                  }`}
-                />
-                <Row label="Lights" value={`${Math.round(zoneArea.value)} ${zoneArea.label}`} />
+                <Row label="Delivers" value={`${lv.lumens.toLocaleString()} lm`} />
+                <Row label="Suggested" value={`${lv.suggested.toLocaleString()} lm`} />
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Colour (CCT)</span>
                   <span className="flex items-center gap-2 font-semibold">
                     <span
                       className="inline-block h-3.5 w-3.5 rounded-full border border-border"
-                      style={{ backgroundColor: kelvinToCss(layer.cct) }}
+                      style={{ backgroundColor: kelvinToCss(lv.cct) }}
                     />
-                    {layer.cct}K
+                    {lv.cct}K
                   </span>
+                </div>
+                <div className="pt-1">
+                  <FlagBadge flag={lv.flag} />
                 </div>
                 <p className="flex items-start gap-1.5 border-t pt-2 text-xs text-muted-foreground">
                   <Info className="mt-0.5 h-3 w-3 shrink-0" />
-                  {layer.criNote}
+                  {lv.criNote}
                 </p>
               </CardContent>
             </Card>
@@ -368,6 +544,57 @@ function LayeredResults({ result, unitSystem }: { result: LayeredResult; unitSys
         {KRUITHOF_NOTE}
       </p>
     </div>
+  );
+}
+
+function flagTone(flag: Flag) {
+  if (flag.verdict === 'on-target')
+    return { color: 'text-brand-sage', Icon: Check, label: 'On target' };
+  const label = `${flag.strong ? 'Well ' : ''}${flag.verdict === 'below' ? 'below' : 'above'} target`;
+  return { color: 'text-brand-bronze', Icon: flag.verdict === 'below' ? ArrowDown : ArrowUp, label };
+}
+
+function FlagBanner({ flag, unit }: { flag: Flag; unit: string }) {
+  const tone = flagTone(flag);
+  const diffText =
+    flag.diff === 0
+      ? 'exactly on the required budget'
+      : `${flag.diff > 0 ? '+' : '−'}${Math.abs(flag.diff).toLocaleString()} ${unit} (${
+          flag.pct > 0 ? '+' : ''
+        }${flag.pct}%) vs required`;
+  return (
+    <div
+      className={cn(
+        'flex items-start gap-2 rounded-lg border p-4 text-sm',
+        flag.verdict === 'on-target'
+          ? 'border-brand-sage/40 bg-brand-sage/10'
+          : 'border-brand-bronze/40 bg-brand-bronze/10'
+      )}
+    >
+      <tone.Icon className={cn('mt-0.5 h-4 w-4 shrink-0', tone.color)} />
+      <div className="text-muted-foreground">
+        <span className={cn('font-semibold', tone.color)}>
+          {tone.label} — {Math.round(flag.ratio * 100)}% of required.
+        </span>{' '}
+        {diffText}.{' '}
+        {flag.verdict === 'below'
+          ? 'Add or upsize fixtures to close the gap.'
+          : flag.verdict === 'above'
+          ? 'You have headroom — drop a fixture or add dimming to tune and save energy.'
+          : 'This design meets the room’s required output.'}
+      </div>
+    </div>
+  );
+}
+
+function FlagBadge({ flag }: { flag: Flag }) {
+  const tone = flagTone(flag);
+  return (
+    <span className={cn('inline-flex items-center gap-1 text-xs font-semibold', tone.color)}>
+      <tone.Icon className="h-3 w-3" />
+      {tone.label} · {flag.pct > 0 ? '+' : ''}
+      {flag.pct}%
+    </span>
   );
 }
 
