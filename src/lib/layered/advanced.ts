@@ -1,5 +1,5 @@
 import { CalculationResult, FixtureCategory, LayerKey } from '@/types';
-import { FIXTURE_SIZES } from '@/lib/fixtureTypes';
+import { getActiveFixtures, resolveFixture } from '@/lib/fixtureCatalog';
 
 // Advanced (layered) mode keeps the SAME required-lumens budget as Simple mode
 // (room lumens/ft² × ceiling factor × daylight factor — computed by
@@ -16,7 +16,7 @@ export const LAYER_BUDGET_SHARE: Record<LayerKey, number> = {
 };
 
 // Which fixture families belong to each layer (brief §1, mapped to the existing
-// FIXTURE_SIZES categories). The user picks specific sizes within these.
+// fixture categories). The user picks specific sizes within these.
 export const LAYER_FIXTURE_CATEGORIES: Record<LayerKey, FixtureCategory[]> = {
   ambient: ['recessed', 'pendant', 'linear'],
   task: ['track', 'linear'],
@@ -68,9 +68,9 @@ export function suggestedLayerLumens(
 // Fixture presets available to a layer, each with its recommended lumens.
 export function fixturesForLayer(layer: LayerKey): { key: string; name: string; lumens: number }[] {
   const cats = LAYER_FIXTURE_CATEGORIES[layer];
-  return Object.entries(FIXTURE_SIZES)
-    .filter(([, f]) => cats.includes(f.category))
-    .map(([key, f]) => ({ key, name: f.name, lumens: f.typicalLumens.recommended }));
+  return getActiveFixtures()
+    .filter((f) => cats.includes(f.category))
+    .map((f) => ({ key: f.id, name: f.name, lumens: f.typicalLumens.recommended }));
 }
 
 // User selection: per layer, a map of fixture preset key → quantity.
@@ -90,7 +90,7 @@ export function layerTotals(layer: LayerKey, counts: FixtureCounts): LayerTotals
   const fixtures = Object.entries(map)
     .filter(([, qty]) => qty > 0)
     .map(([key, qty]) => {
-      const f = FIXTURE_SIZES[key];
+      const f = resolveFixture(key);
       const lumens = f?.typicalLumens.recommended ?? 0;
       return { key, name: f?.name ?? key, quantity: qty, lumens, subtotal: qty * lumens };
     });
