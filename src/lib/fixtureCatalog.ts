@@ -1,6 +1,55 @@
-import { FixtureDef } from '@/types';
-import { CurrencyCode } from '@/config/markets';
+import { FixtureCategory, FixtureDef } from '@/types';
+import { CurrencyCode, MARKETS } from '@/config/markets';
 import { BUILTIN_FIXTURES } from './fixtureTypes';
+
+// Persisted shape in Setting('fixtures'). `items` is the admin's authoritative
+// catalogue (edited built-ins + additions); it is merged over the built-ins.
+export type FixtureStore = { items: FixtureDef[] };
+
+const FIXTURE_CATEGORIES: FixtureCategory[] = [
+  'recessed',
+  'pendant',
+  'track',
+  'linear',
+  'sconce',
+  'strip',
+];
+
+// Validate a parsed fixtures store before accepting it. Returns an error string,
+// or null when valid. Shared by the API route (server) and admin editor (client).
+export function validateFixtures(value: unknown): string | null {
+  if (typeof value !== 'object' || value === null) return 'Top level must be an object.';
+  const store = value as Record<string, unknown>;
+  if (!Array.isArray(store.items)) return '"items" must be an array.';
+  const codes = Object.keys(MARKETS) as CurrencyCode[];
+  const seen = new Set<string>();
+  for (const raw of store.items) {
+    if (typeof raw !== 'object' || raw === null) return 'Each fixture must be an object.';
+    const f = raw as Record<string, unknown>;
+    if (typeof f.id !== 'string' || !f.id.trim()) return 'Each fixture needs a non-empty "id".';
+    if (seen.has(f.id)) return `Duplicate fixture id "${f.id}".`;
+    seen.add(f.id);
+    if (typeof f.name !== 'string' || !f.name.trim()) return `"${f.id}" needs a "name".`;
+    if (!FIXTURE_CATEGORIES.includes(f.category as FixtureCategory))
+      return `"${f.id}" has an invalid category. Allowed: ${FIXTURE_CATEGORIES.join(', ')}.`;
+    const lm = f.typicalLumens as Record<string, unknown> | undefined;
+    if (!lm || typeof lm !== 'object') return `"${f.id}" needs typicalLumens.`;
+    for (const k of ['min', 'max', 'recommended']) {
+      if (typeof lm[k] !== 'number' || !isFinite(lm[k] as number) || (lm[k] as number) < 0)
+        return `"${f.id}.typicalLumens.${k}" must be a non-negative number.`;
+    }
+    if (typeof f.price !== 'object' || f.price === null) return `"${f.id}" needs a "price" object.`;
+    const price = f.price as Record<string, unknown>;
+    const hasOne = codes.some((c) => typeof price[c] === 'number');
+    if (!hasOne) return `"${f.id}.price" needs at least one currency (${codes.join(', ')}).`;
+    for (const c of Object.keys(price)) {
+      if (!codes.includes(c as CurrencyCode)) return `"${f.id}.price" has unknown currency "${c}".`;
+      if (typeof price[c] !== 'number' || (price[c] as number) < 0)
+        return `"${f.id}.price.${c}" must be a non-negative number.`;
+    }
+  }
+  return null;
+}
 
 // Runtime fixture registry. Defaults to the built-in catalogue so the app works
 // synchronously (SSR, first paint, offline). FixturesProvider hydrates this with
