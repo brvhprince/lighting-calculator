@@ -109,7 +109,7 @@ export default function Home() {
           Design light with the precision of a system.
         </h1>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-          Most homes treat lighting as an afterthought. We engineer it from the first sketch — exact lumens,
+          Most homes treat lighting as an afterthought. We engineer it from the first sketch, exact lumens,
           fixture counts, spacing, cost and energy, to the Pen Homes standard.
         </p>
         <div className="flex gap-3 justify-center flex-wrap pt-2">

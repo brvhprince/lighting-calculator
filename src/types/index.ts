@@ -64,6 +64,7 @@ export type FixtureDef = {
     max: number;
     recommended: number;
   };
+  wattage?: number; // nominal watts — used only to sanity-check efficacy (lm/W)
   price: FixturePrice; // unit price per fixture, by currency
   priceRange?: Partial<Record<CurrencyCode, [number, number]>>; // optional shopping low/high
   archived?: boolean; // soft-deleted: hidden from pickers, still resolvable

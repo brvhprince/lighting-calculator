@@ -51,8 +51,41 @@ export function validateFixtures(value: unknown): string | null {
       if (typeof price[c] !== 'number' || (price[c] as number) < 0)
         return `"${f.id}.price.${c}" must be a non-negative number.`;
     }
+    if (f.wattage !== undefined) {
+      if (typeof f.wattage !== 'number' || !isFinite(f.wattage as number) || (f.wattage as number) <= 0)
+        return `"${f.id}.wattage" must be a positive number when set.`;
+    }
   }
   return null;
+}
+
+// Efficacy band (lm/W) for the sanity-check guardrail. The cost model assumes
+// ~90 lm/W for LED (EFFICACY.led in costEstimator); fixtures far outside this
+// band usually mean a mistyped lumen or wattage. Outside the band is flagged,
+// never blocked — a save still proceeds.
+export const EFFICACY_BAND = { low: 60, high: 130 } as const;
+
+// Non-blocking data-quality warnings for the catalogue. Checks luminous efficacy
+// (recommended lumens ÷ wattage) for any active fixture that declares a wattage,
+// and returns one human-readable line per flagged fixture.
+export function fixtureWarnings(items: FixtureDef[]): string[] {
+  const out: string[] = [];
+  for (const f of items) {
+    if (f.archived) continue;
+    const w = f.wattage;
+    const lm = f.typicalLumens?.recommended;
+    if (typeof w !== 'number' || w <= 0 || typeof lm !== 'number' || lm <= 0) continue;
+    const eff = lm / w;
+    if (eff < EFFICACY_BAND.low)
+      out.push(
+        `${f.name}: ${Math.round(eff)} lm/W is unusually low (under ${EFFICACY_BAND.low}) — check the wattage or lumens.`
+      );
+    else if (eff > EFFICACY_BAND.high)
+      out.push(
+        `${f.name}: ${Math.round(eff)} lm/W is unusually high (over ${EFFICACY_BAND.high}) — verify the lumens or wattage.`
+      );
+  }
+  return out;
 }
 
 // Runtime fixture registry. Defaults to the built-in catalogue so the app works
@@ -90,6 +123,7 @@ function fingerprint(f: FixtureDef): string {
     diameter: f.diameter ?? null,
     diameterMm: f.diameterMm ?? null,
     typicalLumens: f.typicalLumens,
+    wattage: f.wattage ?? null,
     price: f.price,
     priceRange: f.priceRange ?? null,
     archived: !!f.archived,

@@ -5,8 +5,9 @@
 //  list. Everything in the app (cost estimator, shopping list, projects, PDF)
 //  reads from here, so updating a number here updates it everywhere.
 //
-//  ⚠️  The GHS figures below are PLACEHOLDERS — verify against local data (see the
-//      "Where to source real numbers" notes in README) before relying on them.
+//  Figures are dated June 2026 from market research (claude.md / gemini.md):
+//  GHS from Jumia/Melcom/Supply Master + PURC tariffs; USD from EIA + US retail.
+//  Both markets are priced independently — no GHS↔USD exchange rate is applied.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type CurrencyCode = 'USD' | 'GHS';
@@ -30,28 +31,32 @@ export type Market = {
 
 export const MARKETS: Record<CurrencyCode, Market> = {
 
-  // TODO: verify all GHS figures against current Ghana market + ECG/PURC tariffs.
+  // June 2026 research (claude.md / gemini.md). electricityRate uses PURC's
+  // Q3 2026 residential 0–300 kWh band (effective 1 Jul 2026); install is the
+  // per-fixture fitting rate (DirectWayz Accra, GH₵80–200). Re-pull quarterly.
   GHS: {
     code: 'GHS',
     label: 'Ghana (GHS)',
     locale: 'en-GH',
     symbol: 'GH₵',
-    hardwareCost: 1000,
-    installCostPerFixture: 700,
-    electricityRate: 1.6,
-    hardwareLow: 500,
-    hardwareHigh: 1300,
+    hardwareCost: 450,
+    installCostPerFixture: 130,
+    electricityRate: 2.04,
+    hardwareLow: 200,
+    hardwareHigh: 1100,
   },
+  // June 2026 research. electricityRate = EIA 2026 US residential average
+  // (~18¢/kWh); install = mid of $50–250 finish labour. Re-pull twice a year.
   USD: {
     code: 'USD',
     label: 'International (USD)',
     locale: 'en-US',
     symbol: '$',
-    hardwareCost: 80,
-    installCostPerFixture: 90,
-    electricityRate: 0.17,
-    hardwareLow: 40,
-    hardwareHigh: 100,
+    hardwareCost: 100,
+    installCostPerFixture: 150,
+    electricityRate: 0.18,
+    hardwareLow: 50,
+    hardwareHigh: 225,
   },
 };
 

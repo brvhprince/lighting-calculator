@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { CalculationResult } from '@/types';
 import { CostInputs, costInputsFromMarket, estimateCost } from '@/lib/costEstimator';
+import { fixturesOnlyRange } from '@/lib/pricing';
 import { useCurrency } from '@/context/CurrencyProvider';
 import { DollarSign, Zap, Leaf, TrendingDown } from 'lucide-react';
 
@@ -27,6 +28,19 @@ export function CostEnergyEstimator({ result }: Props) {
     () => estimateCost(result, inputs, market.code),
     [result, inputs, market.code]
   );
+
+  // Budget→premium spread for the material line: fixture price range (from each
+  // fixture's priceRange) plus the same per-room hardware input shown above.
+  const materialRange = useMemo(() => {
+    const fixtures = fixturesOnlyRange(
+      result.fixtureItems?.length ? result.fixtureItems : result.numberOfFixtures,
+      market.code
+    );
+    return {
+      low: Math.round(fixtures.low + inputs.hardwareCost),
+      high: Math.round(fixtures.high + inputs.hardwareCost),
+    };
+  }, [result, market.code, inputs.hardwareCost]);
 
   const update = (patch: Partial<CostInputs>) => setInputs((prev) => ({ ...prev, ...patch }));
 
@@ -120,7 +134,11 @@ export function CostEnergyEstimator({ result }: Props) {
 
         {/* Up-front cost */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <StatTile label="Material cost" value={format(estimate.materialCost)} />
+          <StatTile
+            label="Material cost"
+            value={format(estimate.materialCost)}
+            hint={`${format(materialRange.low)} – ${format(materialRange.high)} (budget–premium)`}
+          />
           <StatTile
             label="Installation"
             value={
@@ -194,8 +212,10 @@ export function CostEnergyEstimator({ result }: Props) {
         </div>
 
         <p className="text-xs text-muted-foreground">
-          * Estimates only. Energy figures derive from required lumens at typical efficacy (LED ≈ 90 lm/W,
-          incandescent ≈ 14 lm/W). Actual prices, tariffs and grid emissions vary by region.
+          * Estimates only. The material cost shown is the typical price; the budget–premium range under it
+          reflects how much fixture choice can swing the bill (e.g. value downlights vs. statement pendants).
+          Energy figures derive from required lumens at typical efficacy (LED ≈ 90 lm/W, incandescent ≈ 14
+          lm/W). Actual prices, tariffs and grid emissions vary by region.
         </p>
       </CardContent>
     </Card>
@@ -206,10 +226,12 @@ function StatTile({
   label,
   value,
   emphasis,
+  hint,
 }: {
   label: string;
   value: string;
   emphasis?: boolean;
+  hint?: string;
 }) {
   return (
     <div
@@ -219,6 +241,7 @@ function StatTile({
     >
       <p className="text-sm text-muted-foreground">{label}</p>
       <p className={`text-2xl font-semibold ${emphasis ? 'text-foreground' : ''}`}>{value}</p>
+      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
     </div>
   );
 }

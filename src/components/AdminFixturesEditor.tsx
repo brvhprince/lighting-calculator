@@ -15,7 +15,7 @@ import { Plus, Save, RotateCcw, Archive, ArchiveRestore, Trash2, Check, AlertTri
 import { useFixtures } from '@/context/FixturesProvider';
 import { FixtureCategory, FixtureDef } from '@/types';
 import { CurrencyCode, MARKETS } from '@/config/markets';
-import { validateFixtures, fixtureOverrides } from '@/lib/fixtureCatalog';
+import { validateFixtures, fixtureOverrides, fixtureWarnings } from '@/lib/fixtureCatalog';
 import { getFixtureUsage } from '@/lib/fixtureUsage';
 
 const CATEGORIES: FixtureCategory[] = ['recessed', 'pendant', 'track', 'linear', 'sconce', 'strip'];
@@ -44,6 +44,11 @@ export default function AdminFixturesEditor() {
   const setPrice = (id: string, currency: CurrencyCode, value: number) =>
     setItems((prev) =>
       prev.map((f) => (f.id === id ? { ...f, price: { ...f.price, [currency]: value } } : f))
+    );
+
+  const setWattage = (id: string, value: number) =>
+    setItems((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, wattage: value > 0 ? value : undefined } : f))
     );
 
   const setLumens = (id: string, recommended: number) =>
@@ -151,6 +156,8 @@ export default function AdminFixturesEditor() {
     }
   };
 
+  const warnings = fixtureWarnings(items);
+
   return (
     <Card>
       <CardHeader>
@@ -186,6 +193,19 @@ export default function AdminFixturesEditor() {
           </p>
         )}
 
+        {warnings.length > 0 && (
+          <div className="rounded-md border border-brand-bronze/40 bg-brand-bronze/10 p-2 text-sm text-brand-bronze">
+            <p className="flex items-center gap-2 font-medium">
+              <AlertTriangle className="h-4 w-4" /> Efficacy check (won&apos;t block saving)
+            </p>
+            <ul className="mt-1 list-disc space-y-0.5 pl-6 text-xs">
+              {warnings.map((w, i) => (
+                <li key={i}>{w}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -193,6 +213,7 @@ export default function AdminFixturesEditor() {
                 <th className="py-2 pr-3">Name</th>
                 <th className="py-2 pr-3">Category</th>
                 <th className="py-2 pr-3">Lumens</th>
+                <th className="py-2 pr-3">Watts</th>
                 {CURRENCIES.map((c) => (
                   <th key={c} className="py-2 pr-3">
                     {c}
@@ -236,6 +257,16 @@ export default function AdminFixturesEditor() {
                       value={f.typicalLumens.recommended}
                       onChange={(e) => setLumens(f.id, Math.max(0, parseInt(e.target.value) || 0))}
                       className="h-8 w-24"
+                    />
+                  </td>
+                  <td className="py-2 pr-3">
+                    <Input
+                      type="number"
+                      min={0}
+                      value={f.wattage ?? ''}
+                      placeholder="—"
+                      onChange={(e) => setWattage(f.id, Math.max(0, parseFloat(e.target.value) || 0))}
+                      className="h-8 w-20"
                     />
                   </td>
                   {CURRENCIES.map((c) => (
