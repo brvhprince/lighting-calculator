@@ -104,7 +104,7 @@ export function ProductRecommendations({ roomType, ceilingHeightFt }: Props) {
         </div>
 
         {/* Penlabs products */}
-        <div>
+        <div className={'hidden'}>
           <h4 className="mb-3 font-display text-lg">Curated Penlabs fixtures</h4>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {products.map((p) => (

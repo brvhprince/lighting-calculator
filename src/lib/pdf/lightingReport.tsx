@@ -327,20 +327,20 @@ function LightingReport(d: LightingReportData) {
           </View>
 
           {/* Penlabs products */}
-          <Text style={s.h2}>Curated Penlabs fixtures</Text>
-          <View style={s.twoCol}>
-            {d.products.map((p) => (
-              <View key={p.name} style={s.col}>
-                <View style={s.card}>
-                  <Text style={s.cardTitle}>{p.name}</Text>
-                  <Text style={s.small}>{p.tagline}</Text>
-                  <Text style={{ marginTop: 4 }}>{p.lumens} · {p.watts}</Text>
-                  <Text>{p.colorTemp} · {p.cri}</Text>
-                  <Text style={s.small}>{p.smart} · {p.finish}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
+          {/*<Text style={s.h2}>Curated Penlabs fixtures</Text>*/}
+          {/*<View style={s.twoCol}>*/}
+          {/*  {d.products.map((p) => (*/}
+          {/*    <View key={p.name} style={s.col}>*/}
+          {/*      <View style={s.card}>*/}
+          {/*        <Text style={s.cardTitle}>{p.name}</Text>*/}
+          {/*        <Text style={s.small}>{p.tagline}</Text>*/}
+          {/*        <Text style={{ marginTop: 4 }}>{p.lumens} · {p.watts}</Text>*/}
+          {/*        <Text>{p.colorTemp} · {p.cri}</Text>*/}
+          {/*        <Text style={s.small}>{p.smart} · {p.finish}</Text>*/}
+          {/*      </View>*/}
+          {/*    </View>*/}
+          {/*  ))}*/}
+          {/*</View>*/}
 
           {/* Recommendations */}
           <Text style={s.h2}>Notes &amp; recommendations</Text>
