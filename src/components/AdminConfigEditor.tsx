@@ -57,7 +57,7 @@ export default function AdminConfigEditor() {
     setSaving(false);
     if (ok) {
       setOverrides(parsed as MarketOverrides);
-      setStatus({ kind: 'ok', msg: 'Saved to the database — live for everyone, persists across deploys.' });
+      setStatus({ kind: 'ok', msg: 'Saved to the database, live for everyone, persists across deploys.' });
     }
   };
 
@@ -104,7 +104,7 @@ export default function AdminConfigEditor() {
         <div className="text-sm text-muted-foreground">
           <p className="font-medium text-foreground">Pricing &amp; market configuration</p>
           <p>
-            Edits are saved to the <strong>database</strong> — live for everyone and persistent across
+            Edits are saved to the <strong>database</strong>, live for everyone and persistent across
             deploys. <strong>Download JSON</strong> any time for a backup or to seed{' '}
             <code className="rounded bg-muted px-1">src/config/markets.ts</code> defaults. Requires{' '}
             <code className="rounded bg-muted px-1">DATABASE_URL</code> set and the schema pushed

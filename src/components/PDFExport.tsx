@@ -7,6 +7,7 @@ import { FileDown, Loader2 } from 'lucide-react';
 import { ROOM_TYPES } from '@/lib/roomTypes';
 import { useCurrency } from '@/context/CurrencyProvider';
 import { gatherLightingReportData } from '@/lib/pdf/reportData';
+import { loadLogoDataUrl } from '@/lib/pdf/brand';
 import { track } from '@/lib/analytics';
 
 type PDFExportProps = {
@@ -27,11 +28,12 @@ export function PDFExport({ result, roomType, customRoomName, polygon, fixtures,
     setBusy(true);
     try {
       const roomName = customRoomName || ROOM_TYPES[roomType]?.name || 'Room';
+      const logoSrc = await loadLogoDataUrl();
 
-      // react-pdf is heavy — load it (and the document) only on demand.
+      // react-pdf is heavy, load it (and the document) only on demand.
       const { buildLightingReportBlob } = await import('@/lib/pdf/lightingReport');
       const blob = await buildLightingReportBlob(
-        gatherLightingReportData({ result, roomType, roomName, market, polygon, fixtures, beamRadiusFt })
+        gatherLightingReportData({ result, roomType, roomName, market, polygon, fixtures, beamRadiusFt, logoSrc })
       );
 
       const url = URL.createObjectURL(blob);
@@ -45,7 +47,7 @@ export function PDFExport({ result, roomType, customRoomName, polygon, fixtures,
       track('pdf_export', { source: polygon ? 'designer' : 'calculator', room: roomType });
     } catch (e) {
       console.error('PDF export failed:', e);
-      alert('Sorry — the PDF could not be generated.');
+      alert('Sorry, the PDF could not be generated.');
     } finally {
       setBusy(false);
     }

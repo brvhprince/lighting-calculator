@@ -16,13 +16,14 @@ import {
 } from 'lucide-react';
 
 const PENCASA_URL = process.env.NEXT_PUBLIC_PENCASA_URL;
+const PENLABS_URL = process.env.NEXT_PUBLIC_PENLABS_URL;
 
 const ecosystem = [
   {
     id: 'pen-homes',
     name: 'Pen Homes',
     role: 'The Architect',
-    body: 'Design-build studio fusing premium architecture with native smart-home logic — your home built with its operating system already inside.',
+    body: 'Design-build studio fusing premium architecture with native smart-home logic. Your home built with its operating system already inside.',
     href: 'https://pen.homes',
     cta: 'Visit Pen Homes',
     available: true,
@@ -31,7 +32,7 @@ const ecosystem = [
     id: 'pencasa',
     name: 'Pencasa',
     role: 'The Shop',
-    body: 'The curated boutique for the smart products used in Pen Homes projects — chosen to the same standard.',
+    body: 'The curated boutique for the smart products used in Pen Homes projects, chosen to the same standard.',
     href: PENCASA_URL,
     cta: PENCASA_URL ? 'Shop Pencasa' : 'Coming soon',
     available: !!PENCASA_URL,
@@ -40,10 +41,10 @@ const ecosystem = [
     id: 'penlabs',
     name: 'Penlabs',
     role: 'The Lab',
-    body: 'The lighting hardware we manufacture when nothing off-the-shelf meets the standard — the fixtures this very tool specs.',
-    href: 'https://penlabs.io',
-    cta: 'Explore Penlabs',
-    available: true,
+    body: 'The lighting hardware we manufacture when nothing off-the-shelf meets the standard. The fixtures this very tool specs.',
+    href: PENLABS_URL,
+    cta: PENLABS_URL ? 'Explore Penlabs' : 'Coming soon',
+    available: !!PENLABS_URL,
   },
 ];
 
@@ -52,7 +53,7 @@ const tools = [
     href: '/calculator',
     icon: Calculator,
     title: 'Complete Calculator',
-    description: 'Fixtures, spacing, layered zones, cost & energy — the full plan.',
+    description: 'Fixtures, spacing, layered zones, cost & energy. The full plan.',
     points: ['Fixture count & spacing', 'Ceiling & daylight aware', 'Cost, energy & ROI'],
     primary: true,
   },
@@ -60,7 +61,7 @@ const tools = [
     href: '/designer',
     icon: Pentagon,
     title: 'Room Designer',
-    description: 'Draw any shape to scale — L, T, or freeform — and see the light.',
+    description: 'Draw any shape to scale. L, T, or freeform and see the light.',
     points: ['Irregular floor plans', 'Auto fixture placement', 'Live coverage heatmap'],
   },
   {
@@ -83,7 +84,7 @@ const features = [
   {
     icon: Ruler,
     title: 'Engineered accuracy',
-    body: 'Industry-standard formulas, adjusted for ceiling height and natural daylight.',
+    body: 'Industry standard formulas, adjusted for ceiling height and natural daylight.',
   },
   {
     icon: Layers,
@@ -103,14 +104,14 @@ export default function Home() {
       {/* Hero */}
       <div className="text-center space-y-5 py-14">
         <p className="text-xs uppercase tracking-[0.3em] text-brand-bronze">
-          Penlabs · From Code to Concrete
+          Penlabs · Precision in light
         </p>
         <h1 className="font-display text-4xl md:text-6xl font-medium text-foreground max-w-3xl mx-auto">
           Design light with the precision of a system.
         </h1>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
           Most homes treat lighting as an afterthought. We engineer it from the first sketch, exact lumens,
-          fixture counts, spacing, cost and energy, to the Pen Homes standard.
+          fixture counts, spacing, cost and energy, all to the Pen Homes standard.
         </p>
         <div className="flex gap-3 justify-center flex-wrap pt-2">
           <Link href="/calculator">
@@ -127,7 +128,7 @@ export default function Home() {
       </div>
 
       {/* Tools */}
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 max-w-6xl mx-auto">
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 mx-auto">
         {tools.map((tool) => (
           <Card
             key={tool.href}
@@ -143,7 +144,7 @@ export default function Home() {
               <CardDescription>{tool.description}</CardDescription>
             </CardHeader>
             <CardContent className="mt-auto space-y-4">
-              <ul className="space-y-2 mb-2">
+              <ul className="space-y-2 mb-6">
                 {tool.points.map((p) => (
                   <li key={p} className="flex gap-2 text-sm">
                     <CheckCircle className="h-4 w-4 shrink-0 text-brand-sage" />
@@ -165,9 +166,9 @@ export default function Home() {
       <div className="mx-auto max-w-5xl rounded-2xl bg-brand-basalt px-8 py-14 text-brand-bone md:px-14">
         <p className="text-xs uppercase tracking-[0.3em] text-brand-bronze">From Code to Concrete</p>
         <h2 className="mt-3 max-w-3xl font-display text-3xl md:text-4xl">The Architecture of Intelligence</h2>
-        <p className="mt-4 max-w-2xl text-brand-bone/80">
+        <p className="mt-4 max-w-3xl text-brand-bone/80">
           Most homes are built as static structures, with technology bolted on later. At Pen Homes we
-          build living systems — fusing high-end architectural design with native smart-home logic from the
+          build living systems by fusing high-end architectural design with native smart-home logic from the
           first sketch. This calculator is a glimpse of that rigour, shared freely.
         </p>
         <div className="mt-8 grid gap-4 text-sm sm:grid-cols-3">
@@ -183,7 +184,7 @@ export default function Home() {
         </div>
         <div className="mt-10">
           <TrackedLink
-            href="https://pen.homes"
+            href="https://www.pen.homes"
             event="brand_cta_click"
             data={{ brand: 'pen-homes', from: 'narrative' }}
           >
@@ -253,7 +254,7 @@ export default function Home() {
       <Card className="max-w-5xl mx-auto">
         <CardHeader>
           <CardTitle className="font-display text-xl">Tuned for every space</CardTitle>
-          <CardDescription>Pre-configured lighting levels for all common rooms — plus custom.</CardDescription>
+          <CardDescription>Pre-configured lighting levels for all common rooms, plus custom.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">

@@ -3,6 +3,7 @@ import {
   Page,
   Text,
   View,
+  Image,
   StyleSheet,
   Svg,
   Polygon,
@@ -10,7 +11,7 @@ import {
   pdf,
 } from '@react-pdf/renderer';
 import { CalculationResult } from '@/types';
-import { Market, formatMoney } from '@/config/markets';
+import { Market, formatMoneyAscii } from '@/config/markets';
 import { LightLayer } from '@/lib/lightingZones';
 import { SpecGuidance, PenlabsProduct } from '@/lib/productRecommendations';
 import { CostEstimate } from '@/lib/costEstimator';
@@ -31,6 +32,7 @@ export type LightingReportData = {
   polygon?: Pt[];
   fixtures?: Pt[];
   beamRadiusFt?: number; // beam light-pool radius at the floor
+  logoSrc?: string; // brand logo as a data URL; falls back to a text mark
 };
 
 // Scaled SVG of the drawn polygon + placed fixtures (+ beam coverage pools).
@@ -107,6 +109,7 @@ const s = StyleSheet.create({
   page: { backgroundColor: '#FFFFFF', color: C.text, fontSize: 10, fontFamily: 'Helvetica', paddingBottom: 56 },
   header: { backgroundColor: C.basalt, color: C.bone, padding: 28, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
   brandRow: { flexDirection: 'row', alignItems: 'center' },
+  logo: { width: 30, height: 30, marginRight: 10 },
   mark: { width: 30, height: 30, borderRadius: 6, backgroundColor: C.bronze, color: C.bone, fontFamily: 'Times-Bold', fontSize: 18, textAlign: 'center', paddingTop: 5, marginRight: 10 },
   brandName: { fontFamily: 'Times-Roman', fontSize: 16, color: C.bone },
   brandSub: { fontSize: 7, letterSpacing: 2, color: C.sage, textTransform: 'uppercase', marginTop: 2 },
@@ -175,7 +178,7 @@ function LightingReport(d: LightingReportData) {
 
   return (
     <Document
-      title={`Penlabs Lighting — ${d.roomName}`}
+      title={`Penlabs Lighting, ${d.roomName}`}
       author="Pen Homes"
       subject="Lighting design report"
     >
@@ -183,7 +186,12 @@ function LightingReport(d: LightingReportData) {
         {/* Header */}
         <View style={s.header}>
           <View style={s.brandRow}>
-            <Text style={s.mark}>P</Text>
+            {d.logoSrc ? (
+              // eslint-disable-next-line jsx-a11y/alt-text
+              <Image src={d.logoSrc} style={s.logo} />
+            ) : (
+              <Text style={s.mark}>P</Text>
+            )}
             <View>
               <Text style={s.brandName}>Penlabs Lighting</Text>
               <Text style={s.brandSub}>by Pen Homes</Text>
@@ -210,8 +218,19 @@ function LightingReport(d: LightingReportData) {
           <View style={s.twoCol}>
             <View style={s.col}>
               <View style={{ marginTop: 8 }}>
-                <Row label="Lumens per sq ft" value={String(result.lumensPerSqFt)} />
-                <Row label="Ceiling height" value={`${(result.ceilingHeightFt ?? 8).toFixed(1)} ft`} />
+                {result.areaUnit === 'm²' ? (
+                  <Row label="Lumens per m²" value={String(Math.round(result.lumensPerSqFt * 10.7639))} />
+                ) : (
+                  <Row label="Lumens per sq ft" value={String(result.lumensPerSqFt)} />
+                )}
+                <Row
+                  label="Ceiling height"
+                  value={
+                    result.areaUnit === 'm²'
+                      ? `${((result.ceilingHeightFt ?? 8) * 0.3048).toFixed(1)} m`
+                      : `${(result.ceilingHeightFt ?? 8).toFixed(1)} ft`
+                  }
+                />
                 {result.ceilingFactor != null && result.ceilingFactor !== 1 ? (
                   <Row
                     label="Ceiling adjustment"
@@ -230,7 +249,7 @@ function LightingReport(d: LightingReportData) {
               <Text style={[s.small, { marginBottom: 4 }]}>
                 {hasPolygon
                   ? 'Drawn floor plan with fixture layout'
-                  : `Suggested layout — ${result.spacing.layout.rows} × ${result.spacing.layout.columns}, ${result.spacing.fromWall} ${result.spacing.unit} from walls`}
+                  : `Suggested layout, ${result.spacing.layout.rows} × ${result.spacing.layout.columns}, ${result.spacing.fromWall} ${result.spacing.unit} from walls`}
               </Text>
               <View style={[s.layoutBox, hasPolygon ? { alignItems: 'center' } : {}]}>
                 {hasPolygon ? (
@@ -258,7 +277,7 @@ function LightingReport(d: LightingReportData) {
           {d.layers.map((l) => (
             <View key={l.key} style={s.row}>
               <Text style={s.rowLabel}>
-                {l.name} — {l.examples}
+                {l.name}, {l.examples}
               </Text>
               <Text style={s.rowValue}>
                 {l.lumens.toLocaleString()} lm · {l.percent}%
@@ -270,13 +289,13 @@ function LightingReport(d: LightingReportData) {
           <Text style={s.h2}>Cost &amp; energy ({market.code})</Text>
           <View style={s.twoCol}>
             <View style={s.col}>
-              <Row label="Material (fixtures + hardware)" value={`${formatMoney(d.fixtureRange.low, market)} – ${formatMoney(d.fixtureRange.high, market)}`} />
-              <Row label="LED running cost" value={`${formatMoney(d.cost.annualEnergyCostLed, market)}/yr`} />
-              <Row label="vs. incandescent" value={`${formatMoney(d.cost.annualEnergyCostIncandescent, market)}/yr`} />
+              <Row label="Material (fixtures + hardware)" value={`${formatMoneyAscii(d.fixtureRange.low, market)} – ${formatMoneyAscii(d.fixtureRange.high, market)}`} />
+              <Row label="LED running cost" value={`${formatMoneyAscii(d.cost.annualEnergyCostLed, market)}/yr`} />
+              <Row label="vs. incandescent" value={`${formatMoneyAscii(d.cost.annualEnergyCostIncandescent, market)}/yr`} />
             </View>
             <View style={s.col}>
-              <Row label="LED saves" value={`${formatMoney(d.cost.annualSavings, market)}/yr`} />
-              <Row label="Over 10 years" value={formatMoney(d.cost.tenYearSavings, market)} />
+              <Row label="LED saves" value={`${formatMoneyAscii(d.cost.annualSavings, market)}/yr`} />
+              <Row label="Over 10 years" value={formatMoneyAscii(d.cost.tenYearSavings, market)} />
               <Row label="CO₂ avoided" value={`${d.cost.annualCo2SavedKg} kg/yr`} />
             </View>
           </View>
@@ -334,7 +353,7 @@ function LightingReport(d: LightingReportData) {
         </View>
 
         <View style={s.footer} fixed>
-          <Text style={s.footerText}>Penlabs Lighting · a Pen Homes company — intentional, invisible technology.</Text>
+          <Text style={s.footerText}>Penlabs Lighting · a Pen Homes company. Intentional, invisible technology.</Text>
           <Text style={s.footerText} render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} />
         </View>
       </Page>

@@ -22,7 +22,7 @@ import { useFixtures } from '@/context/FixturesProvider';
 type Mode = 'simple' | 'advanced';
 
 const defaultShared = (): SharedInputs => ({
-  unitSystem: 'imperial',
+  unitSystem: 'metric',
   length: '',
   width: '',
   isExpert: false,

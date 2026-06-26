@@ -3,15 +3,20 @@ import { RoomProfile, getRoomProfile } from './roomProfiles';
 
 // Colour-quality class for any room (the 6 profiled rooms override via
 // ROOM_PROFILES). Sources: lighting-spec-guidance-residential.md.
-const CRITICAL_ROOMS = new Set(['office']);
+const CRITICAL_ROOMS = new Set(['office', 'study', 'craftRoom']);
 const UTILITY_ROOMS = new Set([
   'garage',
   'laundry',
   'basement',
   'closet',
+  'storage',
+  'pantry',
   'hallway',
   'stairway',
   'mudRoom',
+  'foyer',
+  'gym',
+  'balcony',
   'outdoor',
 ]);
 
@@ -23,7 +28,7 @@ export function resolveColorQuality(roomType: string): RoomProfile['colorQuality
   return 'warm';
 }
 
-// Default per-layer CCT (Kelvin) by colour quality — task runs cooler, ambient
+// Default per-layer CCT (Kelvin) by colour quality, task runs cooler, ambient
 // and accent warmer (§4b/§4d). Profiled rooms override with tuned values.
 const CCT_DEFAULTS: Record<RoomProfile['colorQuality'], Record<LayerKey, number>> = {
   warm: { ambient: 2700, task: 3500, accent: 2700 },
@@ -39,21 +44,21 @@ export function resolveLayerCct(roomType: string, layer: LayerKey): number {
 // (R9 ≥ 50 minimum, ≥ 90 premium; Ra ≥ 90) and lighting-spec-guidance-residential.md.
 export function layerCriNote(layer: LayerKey, quality: RoomProfile['colorQuality']): string {
   if (quality === 'critical') {
-    return 'CRI Ra ≥ 90 (prioritise fidelity / high Rf) — colour judgement matters here.';
+    return 'CRI Ra ≥ 90 (prioritise fidelity / high Rf), colour judgement matters here.';
   }
   if (quality === 'utility') {
     return layer === 'task'
       ? 'CRI Ra ≥ 80 is fine for utility task work.'
       : 'CRI Ra ≥ 80 is adequate for a utility space.';
   }
-  // warm residential rooms — skin, timber, warm textiles
-  return 'CRI Ra ≥ 90, R9 ≥ 50. Standard white LEDs are weak in deep red (R9), which makes warm materials look muddy — so R9 matters for residential layers.';
+  // warm residential rooms, skin, timber, warm textiles
+  return 'CRI Ra ≥ 90, R9 ≥ 50. Standard white LEDs are weak in deep red (R9), which makes warm materials look muddy, so R9 matters for residential layers.';
 }
 
-// The "why do the layers differ in colour?" rationale — the Kruithof relationship
+// The "why do the layers differ in colour?" rationale, the Kruithof relationship
 // (brief §4d), flagged as suggestive, not law, per the knowledge base.
 export const KRUITHOF_NOTE =
-  'Why the layers differ in warmth: at low light levels people tend to prefer warm light; at higher levels cooler light feels more natural (the Kruithof relationship — suggestive, not law). So accent and ambient run warmer and dimmable, while task runs brighter and cooler.';
+  'Why the layers differ in warmth: at low light levels people tend to prefer warm light; at higher levels cooler light feels more natural (the Kruithof relationship, suggestive, not law). So accent and ambient run warmer and dimmable, while task runs brighter and cooler.';
 
 // Plain-language description of each layer (layman-first, brief §1).
 export const LAYER_INFO: Record<
@@ -68,11 +73,11 @@ export const LAYER_INFO: Record<
   task: {
     laymanLabel: 'Work / task lights',
     technical: 'Task',
-    help: 'Extra brightness aimed only at work surfaces (a counter, desk or workbench) — not the whole floor, which is why it needs far fewer lumens.',
+    help: 'Extra brightness aimed only at work surfaces (a counter, desk or workbench), not the whole floor, which is why it needs far fewer lumens.',
   },
   accent: {
     laymanLabel: 'Mood / accent lights',
     technical: 'Accent',
-    help: 'A small amount of light for atmosphere — wall washes, uplights, LED strips. Roughly 10–30% of the ambient level.',
+    help: 'A small amount of light for atmosphere, wall washes, uplights, LED strips. Roughly 10–30% of the ambient level.',
   },
 };

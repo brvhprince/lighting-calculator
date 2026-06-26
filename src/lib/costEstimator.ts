@@ -5,7 +5,7 @@ import { resultFixtureMaterial } from './pricing';
 // Luminous efficacy (lumens per watt) by bulb technology.
 // LED is the modern baseline; incandescent/halogen are the legacy comparison.
 export const EFFICACY = {
-  led: 90, // lm/W — typical quality residential LED
+  led: 90, // lm/W, typical quality residential LED
   halogen: 18, // lm/W
   incandescent: 14, // lm/W
 } as const;
@@ -21,7 +21,7 @@ export type CostInputs = {
 };
 
 // Seed the editable cost assumptions from the selected market. Per-fixture
-// material price is no longer here — it comes from the catalogue at estimate time.
+// material price is no longer here, it comes from the catalogue at estimate time.
 export function costInputsFromMarket(market: Market): CostInputs {
   return {
     hardwareCost: market.hardwareCost,

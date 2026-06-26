@@ -46,7 +46,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json(
-      { ok: false, error: 'Database unavailable — is DATABASE_URL set and the schema pushed?' },
+      { ok: false, error: 'Database unavailable, is DATABASE_URL set and the schema pushed?' },
       { status: 503 }
     );
   }

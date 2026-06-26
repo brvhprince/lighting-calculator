@@ -1,6 +1,6 @@
 import { ImageResponse } from 'next/og';
 
-export const alt = 'Penlabs Lighting Calculator — by Pen Homes';
+export const alt = 'Penlabs Lighting Calculator | by Pen Homes';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -50,7 +50,7 @@ export default function OpengraphImage() {
             Design light with the precision of a system.
           </div>
           <div style={{ fontSize: 26, color: '#C9C2B6', fontFamily: 'sans-serif', maxWidth: 880 }}>
-            Lumens, fixtures, spacing, layered zones, cost &amp; energy — to the Pen Homes standard.
+            Lumens, fixtures, spacing, layered zones, cost &amp; energy to to the Pen Homes standard.
           </div>
         </div>
 

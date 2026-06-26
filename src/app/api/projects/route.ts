@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 // editKey (held only in the publisher's browser).
 export async function POST(req: Request) {
   if (!rateLimit(`projects:${clientIp(req)}`, 10, 60_000)) {
-    return NextResponse.json({ ok: false, error: 'Too many requests — try again shortly.' }, { status: 429 });
+    return NextResponse.json({ ok: false, error: 'Too many requests, try again shortly.' }, { status: 429 });
   }
 
   let body: Record<string, unknown> = {};
@@ -57,7 +57,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, code: newCode, editKey: newEditKey });
   } catch {
     return NextResponse.json(
-      { ok: false, error: 'Could not publish — is the database reachable?' },
+      { ok: false, error: 'Could not publish, is the database reachable?' },
       { status: 503 }
     );
   }

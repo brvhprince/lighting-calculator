@@ -49,7 +49,7 @@ export function getSpecGuidance(roomType: string, ceilingHeightFt: number): Spec
   const highCri = HIGH_CRI_ROOMS.has(roomType);
   const cri = highCri ? 'CRI 90+' : 'CRI 80+';
   const criReason = highCri
-    ? 'High colour rendering makes food, skin tones and finishes look true — essential for kitchens, baths and dining.'
+    ? 'High colour rendering makes food, skin tones and finishes look true, essential for kitchens, baths and dining.'
     : 'CRI 80+ is comfortable and accurate for general living spaces.';
 
   let beamAngle: string;

@@ -12,7 +12,7 @@ type Props = {
 };
 
 // Turns the layered zones into switched/dimmed circuits, sizes the connected
-// load, and gives a rough cable-run estimate. Planning aid — not a substitute
+// load, and gives a rough cable-run estimate. Planning aid, not a substitute
 // for an electrician or local code.
 export function CircuitPlan({ result, roomType }: Props) {
   const layers = getLightingLayers(roomType, result.totalLumensNeeded);

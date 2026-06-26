@@ -12,7 +12,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Public: submit a quote request.
 export async function POST(req: Request) {
   if (!rateLimit(`leads:${clientIp(req)}`, 5, 60_000)) {
-    return NextResponse.json({ ok: false, error: 'Too many requests — try again shortly.' }, { status: 429 });
+    return NextResponse.json({ ok: false, error: 'Too many requests, try again shortly.' }, { status: 429 });
   }
 
   let body: Record<string, unknown> = {};
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'Invalid body' }, { status: 400 });
   }
 
-  // Honeypot — bots fill hidden fields; pretend success without storing.
+  // Honeypot, bots fill hidden fields; pretend success without storing.
   if (typeof body.website === 'string' && body.website.trim() !== '') {
     return NextResponse.json({ ok: true });
   }
@@ -68,7 +68,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json(
-      { ok: false, error: 'Could not submit right now — please try again.' },
+      { ok: false, error: 'Could not submit right now, please try again.' },
       { status: 503 }
     );
   }

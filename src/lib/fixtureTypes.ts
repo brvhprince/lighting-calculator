@@ -3,7 +3,7 @@ import { FixtureDef } from '@/types';
 // Built-in fixture catalogue (the default/fallback). The admin can override these
 // or add new fixtures (persisted in Setting('fixtures')); the effective catalogue
 // is resolved through fixtureCatalog.ts. Prices are per-currency and hand-set
-// independently per market — no GHS↔USD exchange rate is used.
+// independently per market, no GHS↔USD exchange rate is used.
 //
 // Values dated June 2026 from market research (see claude.md / gemini.md):
 //   • USD anchored to observed Home Depot / Lowe's / Amazon SKUs.

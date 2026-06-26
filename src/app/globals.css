@@ -4,7 +4,7 @@
 
 /*
  * Pen Homes Design System
- * Penlabs (lighting) palette — Deep Basalt + Bronze/Brass for precision & premium feel.
+ * Penlabs (lighting) palette, Deep Basalt + Bronze/Brass for precision & premium feel.
  *   Deep Basalt  #2C332E  -> 137 8% 19%
  *   Warm Bone    #F5F2ED  -> 38 29% 95%
  *   Warm Linen   #F2EFE9  -> 40 26% 93%
@@ -80,7 +80,7 @@
     @apply bg-background text-foreground;
     font-feature-settings: "ss01", "cv01", "cv11";
   }
-  /* Serif display type for headings — the architectural / luxury voice */
+  /* Serif display type for headings, the architectural / luxury voice */
   h1, h2, .font-display {
     font-family: var(--font-serif), ui-serif, Georgia, serif;
     letter-spacing: -0.01em;

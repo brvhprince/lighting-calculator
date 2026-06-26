@@ -64,7 +64,7 @@ export function getLightingLayers(roomType: string, totalLumens: number): LightL
       key: 'ambient',
       name: 'Ambient (general)',
       percent: mix.ambient,
-      control: 'Primary dimmer zone — set the base brightness for the room.',
+      control: 'Primary dimmer zone, set the base brightness for the room.',
     },
     {
       key: 'task',

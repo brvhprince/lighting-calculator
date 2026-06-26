@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Playfair_Display } from "next/font/google";
+import { Inter, Sora  } from "next/font/google";
 import "./globals.css";
 import Link from "next/link";
 import { ThemeProvider } from "@/components/ThemeProvider";
@@ -10,6 +10,7 @@ import { CurrencySelector } from "@/components/CurrencySelector";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { Analytics } from "@/components/Analytics";
 import { SITE_URL } from "@/lib/site";
+import Image from "next/image";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -17,20 +18,20 @@ const inter = Inter({
   display: "swap",
 });
 
-const playfair = Playfair_Display({
+const sora = Sora({
   subsets: ["latin"],
   variable: "--font-serif",
-  display: "swap",
+  display: "swap"
 });
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Penlabs Lighting Calculator — Pen Homes",
+    default: "Penlabs Lighting Calculator | Pen Homes",
     template: "%s",
   },
   description:
-    "Design the perfect light for any space. Calculate lumens, fixture counts, spacing, layered zones, cost and energy — engineered to the Pen Homes standard.",
+    "Design the perfect light for any space. Calculate lumens, fixture counts, spacing, layered zones, cost and energy, engineered to the Pen Homes standard.",
   applicationName: "Penlabs Lighting Calculator",
   manifest: "/manifest.webmanifest",
   keywords: [
@@ -44,15 +45,15 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "Pen Homes" }],
   openGraph: {
-    title: "Penlabs Lighting Calculator — Pen Homes",
+    title: "Penlabs Lighting Calculator | Pen Homes",
     description:
-      "Engineer light from the first sketch: lumens, fixtures, spacing, cost and energy — to the Pen Homes standard.",
+      "Engineer light from the first sketch: lumens, fixtures, spacing, cost and energy, to the Pen Homes standard.",
     type: "website",
     siteName: "Penlabs Lighting Calculator",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Penlabs Lighting Calculator — Pen Homes",
+    title: "Penlabs Lighting Calculator | Pen Homes",
     description:
       "Engineer light from the first sketch: lumens, fixtures, spacing, cost and energy.",
   },
@@ -71,7 +72,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${inter.variable} ${playfair.variable}`}>
+    <html lang="en" suppressHydrationWarning className={`${inter.variable} ${sora.variable}`}>
       <body className="font-sans antialiased">
         <Analytics />
         <ServiceWorkerRegister />
@@ -83,9 +84,7 @@ export default function RootLayout({
               <div className="container mx-auto px-4 py-4">
                 <div className="flex items-center justify-between">
                   <Link href="/" className="flex items-center gap-3 group">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground font-display text-lg leading-none">
-                      P
-                    </div>
+                    <Image src={'/media/penlabs-icon.png'} alt={'Penlabs Icon'} width={40} height={40} />
                     <div className="leading-tight">
                       <div className="font-display text-lg tracking-tight text-foreground">
                         Penlabs Lighting
@@ -126,14 +125,14 @@ export default function RootLayout({
                 </div>
               </div>
             </nav>
-            <main className="container mx-auto px-4 py-10">{children}</main>
+            <main className="container mx-auto px-6 py-10">{children}</main>
             <footer className="border-t border-border bg-background/80 backdrop-blur-sm mt-16">
               <div className="container mx-auto px-4 py-8 space-y-1 text-center">
                 <p className="font-display text-sm tracking-wide text-foreground">
                   The Architecture of Intelligence
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  © {new Date().getFullYear()} Penlabs — a Pen Homes company. Intentional, invisible technology.
+                  © {new Date().getFullYear()} Penlabs - a Pen Homes company. Intentional, invisible technology.
                 </p>
               </div>
             </footer>

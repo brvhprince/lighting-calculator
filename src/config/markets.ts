@@ -7,7 +7,7 @@
 //
 //  Figures are dated June 2026 from market research (claude.md / gemini.md):
 //  GHS from Jumia/Melcom/Supply Master + PURC tariffs; USD from EIA + US retail.
-//  Both markets are priced independently — no GHS↔USD exchange rate is applied.
+//  Both markets are priced independently, no GHS↔USD exchange rate is applied.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type CurrencyCode = 'USD' | 'GHS';
@@ -124,5 +124,26 @@ export function formatMoney(value: number, market: Market): string {
     }).format(value);
   } catch {
     return `${market.symbol}${value.toLocaleString()}`;
+  }
+}
+
+// PDF-safe money formatting. react-pdf's built-in Helvetica only covers Latin-1,
+// so symbols like the Ghana cedi (₵, U+20B5) render as a missing box. For any
+// market whose symbol has a non-Latin-1 character, fall back to the ISO code
+// (e.g. "GHS 1,234"); markets with an ASCII symbol (e.g. "$") keep the symbol.
+export function formatMoneyAscii(value: number, market: Market): string {
+  const asciiSafe = /^[\x20-\xFF]*$/.test(market.symbol);
+  try {
+    return new Intl.NumberFormat(market.locale, {
+      style: 'currency',
+      currency: market.code,
+      currencyDisplay: asciiSafe ? 'narrowSymbol' : 'code',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(value);
+  } catch {
+    return asciiSafe
+      ? `${market.symbol}${value.toLocaleString()}`
+      : `${market.code} ${value.toLocaleString()}`;
   }
 }

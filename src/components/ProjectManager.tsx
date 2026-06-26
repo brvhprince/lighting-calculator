@@ -26,6 +26,8 @@ import {
 import { getSavedCalculations } from '@/lib/savedCalculations';
 import { useCurrency } from '@/context/CurrencyProvider';
 import { roomCostRange } from '@/lib/pricing';
+import { gatherProjectReportData } from '@/lib/pdf/reportData';
+import { loadLogoDataUrl } from '@/lib/pdf/brand';
 import { track } from '@/lib/analytics';
 import { Project } from '@/types/project';
 import { SavedCalculation } from '@/types/saved-calculations';
@@ -41,6 +43,8 @@ import {
   Copy,
   Check,
   X,
+  FileDown,
+  Loader2,
 } from 'lucide-react';
 
 export default function ProjectManager() {
@@ -52,6 +56,7 @@ export default function ProjectManager() {
   const [roomToAdd, setRoomToAdd] = useState<string>('');
   const [publishing, setPublishing] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const refresh = () => {
@@ -120,6 +125,33 @@ export default function ProjectManager() {
     a.download = `${active.name.replace(/\s+/g, '-').toLowerCase()}-pen-homes.json`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleExportPdf = async () => {
+    if (!active) return;
+    setPdfBusy(true);
+    try {
+      const logoSrc = await loadLogoDataUrl();
+      // react-pdf is heavy, load it (and the document) only on demand.
+      const { buildProjectReportBlob } = await import('@/lib/pdf/projectReport');
+      const blob = await buildProjectReportBlob(
+        gatherProjectReportData({ project: active, market, logoSrc })
+      );
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `penlabs-project-${active.name.replace(/\s+/g, '-').toLowerCase()}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      track('project_pdf_export', { rooms: active.rooms.length });
+    } catch (e) {
+      console.error('Project PDF export failed:', e);
+      alert('Sorry, the project PDF could not be generated.');
+    } finally {
+      setPdfBusy(false);
+    }
   };
 
   const handlePublish = async () => {
@@ -203,7 +235,7 @@ export default function ProjectManager() {
         refresh();
         setActiveId(p.id);
       } catch {
-        alert('Could not import that file — expected a Pen Homes project JSON.');
+        alert('Could not import that file, expected a Pen Homes project JSON.');
       }
     };
     reader.readAsText(file);
@@ -307,11 +339,21 @@ export default function ProjectManager() {
                         ? 'Publishing…'
                         : 'Publish'}
                     </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleExportPdf}
+                      disabled={pdfBusy || active.rooms.length === 0}
+                      className="gap-1.5"
+                    >
+                      {pdfBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+                      {pdfBusy ? 'Building…' : 'PDF'}
+                    </Button>
                     <Button variant="outline" size="sm" onClick={() => window.print()} className="gap-1.5">
                       <Printer className="h-4 w-4" /> Print
                     </Button>
                     <Button variant="outline" size="sm" onClick={handleExport} className="gap-1.5">
-                      <Download className="h-4 w-4" /> Export
+                      <Download className="h-4 w-4" /> Export JSON
                     </Button>
                     <Button
                       variant="outline"
@@ -363,7 +405,7 @@ export default function ProjectManager() {
                       </Select>
                     ) : (
                       <p className="text-sm text-muted-foreground">
-                        No saved rooms yet — save a calculation from the Full Calculator first.
+                        No saved rooms yet, save a calculation from the Full Calculator first.
                       </p>
                     )}
                   </div>
@@ -439,7 +481,7 @@ export default function ProjectManager() {
                 )}
 
                 <p className="hidden text-center text-xs text-muted-foreground print:block">
-                  Penlabs Lighting · a Pen Homes company — Project report generated{' '}
+                  Penlabs Lighting · a Pen Homes company. Project report generated{' '}
                   {new Date().toLocaleDateString()}
                 </p>
               </CardContent>

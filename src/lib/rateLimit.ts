@@ -1,5 +1,5 @@
 // Best-effort in-memory rate limiter. Per serverless instance, so it resets on
-// cold starts and isn't shared across regions — defence-in-depth alongside the
+// cold starts and isn't shared across regions, defence-in-depth alongside the
 // honeypot and validation, not a hard guarantee. For strict limits, front it
 // with Upstash/Redis or the platform WAF.
 const hits = new Map<string, { count: number; reset: number }>();

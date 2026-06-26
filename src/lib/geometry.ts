@@ -3,7 +3,7 @@
 
 export type Point = { x: number; y: number };
 
-// Shoelace formula — absolute polygon area for a simple (non-self-intersecting)
+// Shoelace formula, absolute polygon area for a simple (non-self-intersecting)
 // polygon given in feet. Returns square feet.
 export function polygonArea(points: Point[]): number {
   const n = points.length;

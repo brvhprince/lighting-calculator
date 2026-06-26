@@ -127,7 +127,7 @@ export function ProductRecommendations({ roomType, ceilingHeightFt }: Props) {
             ))}
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
-            Penlabs hardware is engineered to the Pen Homes standard — intentional, invisible technology.
+            Penlabs hardware is engineered to the Pen Homes standard. Intentional, invisible technology.
           </p>
           {PENCASA_URL && (
             <a href={PENCASA_URL} target="_blank" rel="noreferrer" className="mt-4 inline-block">

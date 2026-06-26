@@ -61,7 +61,7 @@ export function IlluminanceCheck({ result, roomType }: Props) {
           <tone.Icon className={`mt-0.5 h-4 w-4 shrink-0 ${tone.color}`} />
           <div className="text-muted-foreground">
             <span className={`font-semibold ${tone.color}`}>
-              {tone.label} — {Math.round(v.ratio * 100)}% of target.
+              {tone.label}, {Math.round(v.ratio * 100)}% of target.
             </span>{' '}
             {v.verdict === 'below' ? (
               <>
@@ -71,7 +71,7 @@ export function IlluminanceCheck({ result, roomType }: Props) {
                 lighting alone.
               </>
             ) : v.verdict === 'above' ? (
-              <>You have headroom above target — dimming is recommended to tune and save energy.</>
+              <>You have headroom above target, dimming is recommended to tune and save energy.</>
             ) : (
               <>The ambient layout meets the IES maintained target for this room.</>
             )}

@@ -1,7 +1,7 @@
 import { Resend } from 'resend';
 import { SITE_URL } from '@/lib/site';
 
-// Resend is optional — if RESEND_API_KEY isn't set, email is skipped silently
+// Resend is optional, if RESEND_API_KEY isn't set, email is skipped silently
 // (the lead is still stored). Set a verified sender in LEAD_FROM_EMAIL and an
 // internal recipient in LEAD_NOTIFY_EMAIL.
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
@@ -55,7 +55,7 @@ const shell = (inner: string) => `
     <div style="border:1px solid #DAD5CC;border-top:none;border-radius:0 0 10px 10px;padding:24px">
       ${inner}
       <p style="font-size:11px;color:#6B6F6A;margin-top:24px;border-top:1px solid #DAD5CC;padding-top:12px">
-        Penlabs Lighting · a Pen Homes company — intentional, invisible technology.
+        Penlabs Lighting · a Pen Homes company · intentional, invisible technology.
       </p>
     </div>
   </div>`;
@@ -85,7 +85,7 @@ export async function sendLeadEmails(lead: LeadEmailInput): Promise<void> {
       from: FROM,
       to: lead.email,
       replyTo: REPLY_TO,
-      subject: `Your lighting plan${lead.roomName ? ` — ${lead.roomName}` : ''}`,
+      subject: `Your lighting plan${lead.roomName ? `, ${lead.roomName}` : ''}`,
       attachments,
       html: shell(`
         <p>Hi ${escapeHtml(lead.name)},</p>
@@ -94,7 +94,7 @@ export async function sendLeadEmails(lead: LeadEmailInput): Promise<void> {
         } and a member of our team will be in touch shortly.</p>
         ${specLines(lead.spec)}
         ${attachments ? '<p>Your full lighting report is attached as a PDF.</p>' : ''}
-        <p>We design your home and its intelligence simultaneously — from the first sketch to a seamless install.</p>
+        <p>We design your home and its intelligence simultaneously, from the first sketch to a seamless install.</p>
         <div style="margin:20px 0 4px">
           ${button(tagged('/calculator', 'quote-followup'), 'Plan another room')}
           ${CONSULT_URL ? button(tagged(CONSULT_URL, 'quote-consult'), 'Book a consultation', false) : ''}

@@ -93,7 +93,7 @@ export function FixturesProvider({ children }: { children: React.ReactNode }) {
         }
       })
       .catch(() => {
-        /* offline / no DB — keep cached/default values */
+        /* offline / no DB, keep cached/default values */
       });
   }, []);
 

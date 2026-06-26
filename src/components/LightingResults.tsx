@@ -30,7 +30,7 @@ export function LightingResults({ result, roomType, customRoomName, source = 'ca
   const roomName = customRoomName || ROOM_TYPES[roomType]?.name || 'Room';
 
   // The inline "Request a quote" CTA sits at the very bottom of a long page, so we
-  // also surface a floating action button — and hide it once the inline CTA is on
+  // also surface a floating action button, and hide it once the inline CTA is on
   // screen, to avoid showing two identical buttons at once.
   const ctaRef = useRef<HTMLDivElement>(null);
   const [ctaVisible, setCtaVisible] = useState(false);
@@ -73,10 +73,18 @@ export function LightingResults({ result, roomType, customRoomName, source = 'ca
               <Row label="Number of Fixtures" value={String(result.numberOfFixtures)} />
               <Row label="Fixture Size" value={result.fixtureSize} />
               <Row label="Lumens per Fixture" value={String(result.lumensPerFixture)} />
-              <Row label="Lumens per Sq Ft" value={String(result.lumensPerSqFt)} />
+              {result.areaUnit === 'm²' ? (
+                <Row label="Lumens per m²" value={String(Math.round(result.lumensPerSqFt * 10.7639))} />
+              ) : (
+                <Row label="Lumens per Sq Ft" value={String(result.lumensPerSqFt)} />
+              )}
               {result.ceilingFactor != null && result.ceilingFactor !== 1 && (
                 <Row
-                  label={`Ceiling Adjustment (${result.ceilingHeightFt?.toFixed(1)} ft)`}
+                  label={`Ceiling Adjustment (${
+                    result.areaUnit === 'm²'
+                      ? `${((result.ceilingHeightFt ?? 0) * 0.3048).toFixed(1)} m`
+                      : `${result.ceilingHeightFt?.toFixed(1)} ft`
+                  })`}
                   value={`${result.ceilingFactor > 1 ? '+' : ''}${Math.round((result.ceilingFactor - 1) * 100)}%`}
                   accent="bronze"
                 />
@@ -128,14 +136,14 @@ export function LightingResults({ result, roomType, customRoomName, source = 'ca
           <div>
             <p className="font-display text-lg">Bring this design to life with Pen Homes</p>
             <p className="text-sm text-muted-foreground">
-              We design your home and its intelligence simultaneously — from sketch to seamless install.
+              We design your home and its intelligence simultaneously, from sketch to seamless install.
             </p>
           </div>
           <QuoteRequestDialog result={result} roomType={roomType} roomName={roomName} source={source} />
         </CardContent>
       </Card>
 
-      {/* Floating quote CTA — visible while reading the results, hidden once the
+      {/* Floating quote CTA, visible while reading the results, hidden once the
           inline CTA above is on screen. Opens the same form directly. */}
       <div
         className={`fixed bottom-6 right-6 z-40 transition-all duration-300 print:hidden ${

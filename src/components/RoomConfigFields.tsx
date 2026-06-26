@@ -85,6 +85,29 @@ export function RoomConfigFields({
   const toDisp = (ft: number) => (unitSystem === 'metric' ? ft * FT_TO_M : ft);
   const fromDisp = (v: number) => (unitSystem === 'metric' ? v / FT_TO_M : v);
 
+  // Light-density display: values are stored as lumens/ft² (the engine's unit);
+  // metric users see and enter lumens/m² (1 lm/ft² = 10.7639 lm/m²).
+  const SQFT_PER_SQM = 10.7639;
+  const isMetric = unitSystem === 'metric';
+  const densityUnit = isMetric ? 'lm/m²' : 'lumens/ft²';
+  const densityUnitShort = isMetric ? 'lm/m²' : 'lm/ft²';
+  const perAreaLabel = isMetric ? 'Lumens per Square Metre' : 'Lumens per Square Foot';
+  // Preset density (stored lm/ft²) shown in the active unit.
+  const toDensity = (perSqFt: number) => (isMetric ? Math.round(perSqFt * SQFT_PER_SQM) : perSqFt);
+  // An editable density field is stored as lm/ft² but shown/entered in the active unit.
+  const densityShown = (storedLmFt2: string) => {
+    if (!storedLmFt2) return '';
+    const n = parseFloat(storedLmFt2);
+    if (!isFinite(n)) return storedLmFt2;
+    return isMetric ? String(Math.round(n * SQFT_PER_SQM)) : storedLmFt2;
+  };
+  const densityStored = (typed: string) => {
+    if (!typed) return '';
+    const n = parseFloat(typed);
+    if (!isFinite(n)) return typed;
+    return isMetric ? String(n / SQFT_PER_SQM) : typed;
+  };
+
   const id = (s: string) => `${idPrefix}-${s}`;
 
   return (
@@ -99,7 +122,7 @@ export function RoomConfigFields({
           <SelectContent>
             {Object.entries(ROOM_TYPES).map(([key, room]) => (
               <SelectItem key={key} value={key}>
-                {room.name} ({room.lumensPerSqFt.recommended} lumens/ft²)
+                {room.name} ({toDensity(room.lumensPerSqFt.recommended)} {densityUnit})
               </SelectItem>
             ))}
             {allowCustomRoom && <SelectItem value="other">Other (Custom)</SelectItem>}
@@ -124,16 +147,16 @@ export function RoomConfigFields({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor={id('room-lumens')}>Lumens per Square Foot</Label>
+            <Label htmlFor={id('room-lumens')}>{perAreaLabel}</Label>
             <Input
               id={id('room-lumens')}
               type="number"
-              placeholder="e.g., 30"
-              value={value.customRoomLumens}
-              onChange={(e) => onChange({ customRoomLumens: e.target.value })}
+              placeholder={isMetric ? 'e.g., 320' : 'e.g., 30'}
+              value={densityShown(value.customRoomLumens)}
+              onChange={(e) => onChange({ customRoomLumens: densityStored(e.target.value) })}
             />
             <p className="text-xs text-muted-foreground">
-              Typical range: 10–80 lumens/ft² depending on room purpose.
+              Typical range: {toDensity(10)}–{toDensity(80)} {densityUnitShort} depending on room purpose.
             </p>
           </div>
         </div>
@@ -254,20 +277,22 @@ export function RoomConfigFields({
               onChange={(e) => onChange({ targetLux: e.target.value })}
             />
             <p className="text-xs text-muted-foreground">
-              IES targets — living ≈100–150, bedroom ≈150, kitchen/bath ≈300–500, office ≈500.
+              IES targets: living ≈100–150, bedroom ≈150, kitchen/bath ≈300–500, office ≈500.
               {value.targetLux && parseFloat(value.targetLux) > 0
-                ? ` ≈ ${(parseFloat(value.targetLux) / 10.7639).toFixed(1)} lm/ft². Overrides the preset.`
+                ? isMetric
+                  ? ` ≈ ${Math.round(parseFloat(value.targetLux))} lm/m² maintained. Overrides the preset.`
+                  : ` ≈ ${(parseFloat(value.targetLux) / 10.7639).toFixed(1)} lm/ft². Overrides the preset.`
                 : ' Overrides the room preset when set.'}
             </p>
           </div>
           <div className="space-y-2">
-            <Label htmlFor={id('lumens-override')}>Custom Lumens per Square Foot (optional)</Label>
+            <Label htmlFor={id('lumens-override')}>Custom {perAreaLabel} (optional)</Label>
             <Input
               id={id('lumens-override')}
               type="number"
-              placeholder="e.g., 35"
-              value={value.customLumensPerSqFt}
-              onChange={(e) => onChange({ customLumensPerSqFt: e.target.value })}
+              placeholder={isMetric ? 'e.g., 375' : 'e.g., 35'}
+              value={densityShown(value.customLumensPerSqFt)}
+              onChange={(e) => onChange({ customLumensPerSqFt: densityStored(e.target.value) })}
             />
           </div>
           <div className="space-y-2">

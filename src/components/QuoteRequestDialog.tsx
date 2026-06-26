@@ -56,13 +56,15 @@ export function QuoteRequestDialog({ result, roomType, roomName, source, trigger
     // Generate the branded PDF to attach to the auto-reply (best-effort).
     let pdfBase64: string | undefined;
     try {
+      const { loadLogoDataUrl } = await import('@/lib/pdf/brand');
+      const logoSrc = await loadLogoDataUrl();
       const { buildLightingReportBlob } = await import('@/lib/pdf/lightingReport');
       const blob = await buildLightingReportBlob(
-        gatherLightingReportData({ result, roomType, roomName, market })
+        gatherLightingReportData({ result, roomType, roomName, market, logoSrc })
       );
       if (blob.size < 2_500_000) pdfBase64 = await blobToBase64(blob);
     } catch {
-      /* attachment is optional — continue without it */
+      /* attachment is optional, continue without it */
     }
 
     try {
@@ -97,7 +99,7 @@ export function QuoteRequestDialog({ result, roomType, roomName, source, trigger
         setState('error');
       }
     } catch {
-      setError('Network error — please try again.');
+      setError('Network error, please try again.');
       setState('error');
     }
   };
@@ -135,7 +137,7 @@ export function QuoteRequestDialog({ result, roomType, roomName, source, trigger
             </div>
             <DialogTitle className="font-display text-xl">Request received</DialogTitle>
             <DialogDescription className="mt-2">
-              Thank you — the Pen Homes team will be in touch about <strong>{roomName}</strong>. We design
+              Thank you, the Pen Homes team will be in touch about <strong>{roomName}</strong>. We design
               your home and its intelligence simultaneously.
             </DialogDescription>
             <Button className="mt-6" variant="outline" onClick={() => setOpen(false)}>
@@ -177,7 +179,7 @@ export function QuoteRequestDialog({ result, roomType, roomName, source, trigger
                   placeholder="Anything else we should know?"
                 />
               </div>
-              {/* Honeypot — hidden from users */}
+              {/* Honeypot, hidden from users */}
               <input
                 type="text"
                 tabIndex={-1}

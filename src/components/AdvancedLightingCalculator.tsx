@@ -82,7 +82,7 @@ type Props = {
   onAdvanced: (next: AdvancedState) => void;
   result: CalculationResult | null;
   setResult: (r: CalculationResult | null) => void;
-  // Fixture snapshot from a restored save — lets discontinued fixtures still
+  // Fixture snapshot from a restored save, lets discontinued fixtures still
   // render (ghost) and be remapped.
   snapshot?: FixtureSnapshot[];
   description: string;
@@ -433,7 +433,7 @@ export default function AdvancedLightingCalculator({
               <span className="font-semibold">{liveRequired.toLocaleString()} lumens</span>
               <span className="text-muted-foreground">
                 {' '}
-                — split as suggestions across the layers you pick below.
+               , split as suggestions across the layers you pick below.
               </span>
             </div>
           )}
@@ -518,7 +518,7 @@ export default function AdvancedLightingCalculator({
                 </CardTitle>
                 <CardDescription>
                   These fixtures are no longer in the catalogue. The design still totals using the
-                  saved snapshot — pick a current replacement to keep it accurate.
+                  saved snapshot, pick a current replacement to keep it accurate.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
@@ -923,13 +923,13 @@ function FlagBanner({ flag, unit }: { flag: Flag; unit: string }) {
       <tone.Icon className={cn('mt-0.5 h-4 w-4 shrink-0', tone.color)} />
       <div className="text-muted-foreground">
         <span className={cn('font-semibold', tone.color)}>
-          {tone.label} — {Math.round(flag.ratio * 100)}% of required.
+          {tone.label}, {Math.round(flag.ratio * 100)}% of required.
         </span>{' '}
         {diffText}.{' '}
         {flag.verdict === 'below'
           ? 'Add or upsize fixtures to close the gap.'
           : flag.verdict === 'above'
-          ? 'You have headroom — drop a fixture or add dimming to tune and save energy.'
+          ? 'You have headroom, drop a fixture or add dimming to tune and save energy.'
           : 'This design meets the room’s required output.'}
       </div>
     </div>

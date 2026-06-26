@@ -43,7 +43,7 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
         setError('Incorrect passcode.');
       }
     } catch {
-      setError('Could not verify — check your connection and try again.');
+      setError('Could not verify, check your connection and try again.');
     } finally {
       setLoading(false);
     }

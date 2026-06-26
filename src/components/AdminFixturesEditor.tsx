@@ -97,7 +97,7 @@ export default function AdminFixturesEditor() {
 
   const remove = (f: FixtureDef) => {
     if (f.builtIn) {
-      alert('Built-in fixtures cannot be deleted — archive them instead.');
+      alert('Built-in fixtures cannot be deleted. Archive them instead.');
       return;
     }
     if (!f.archived) {
@@ -149,8 +149,8 @@ export default function AdminFixturesEditor() {
       setStatus({
         kind: 'ok',
         msg: override.length
-          ? `Saved ${override.length} fixture override(s) — live for everyone.`
-          : 'No changes from built-in defaults — saved as defaults.',
+          ? `Saved ${override.length} fixture override(s). Live for everyone.`
+          : 'No changes from built-in defaults. Saved as defaults.',
       });
     }
   };
@@ -275,7 +275,7 @@ export default function AdminFixturesEditor() {
                       type="number"
                       min={0}
                       value={f.wattage ?? ''}
-                      placeholder="—"
+                      placeholder="-"
                       onChange={(e) => setWattage(f.id, Math.max(0, parseFloat(e.target.value) || 0))}
                       className="h-8 w-20"
                     />

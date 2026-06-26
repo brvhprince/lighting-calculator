@@ -1,12 +1,12 @@
 // Lumen-method verification (IESNA). Back-calculates the maintained illuminance
 // a layout actually delivers to the work plane, accounting for the coefficient
 // of utilisation (CU) and light-loss factor (LLF). CU here is ESTIMATED from the
-// room cavity ratio — real CU comes from a fixture's photometric file.
+// room cavity ratio, real CU comes from a fixture's photometric file.
 
 const SQFT_TO_SQM = 0.092903;
 const LUX_PER_FC = 10.7639;
 const WORK_PLANE_FT = 2.5; // typical desk/counter height
-const LLF = 0.8; // light-loss factor (dirt, lumen depreciation) — typical maintained
+const LLF = 0.8; // light-loss factor (dirt, lumen depreciation), typical maintained
 
 function clamp(v: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, v));
@@ -14,7 +14,7 @@ function clamp(v: number, lo: number, hi: number) {
 
 // Estimated coefficient of utilisation from the room cavity ratio. Higher in
 // big, low-cavity rooms; lower as the cavity (mounting height above the work
-// plane) grows — this is the inverse-square / mounting-height effect from
+// plane) grows, this is the inverse-square / mounting-height effect from
 // `lighting-101-watt-lumens-candela-lux-nits.md`: light from a high ceiling
 // spreads and is lost before it reaches the floor. Real CU comes from a
 // fixture's photometric file; this is an estimate.

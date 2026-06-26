@@ -2,7 +2,7 @@ import { CalculationResult, FixtureCategory, FixtureItem, LayerKey } from '@/typ
 import { getActiveFixtures, resolveFixture } from '@/lib/fixtureCatalog';
 
 // Advanced (layered) mode keeps the SAME required-lumens budget as Simple mode
-// (room lumens/ft² × ceiling factor × daylight factor — computed by
+// (room lumens/ft² × ceiling factor × daylight factor, computed by
 // calculateLighting). The user then chooses real fixtures per layer and we check
 // the installed total against that budget. Nothing here re-lights the room three
 // times: the per-layer suggestions are SHARES of the one budget.
@@ -52,7 +52,7 @@ export function flagLumens(achieved: number, target: number): Flag {
   };
 }
 
-// Suggested per-layer lumen targets — the required budget split across the
+// Suggested per-layer lumen targets, the required budget split across the
 // SELECTED layers (shares renormalised so they always sum to the budget).
 export function suggestedLayerLumens(
   requiredLumens: number,
@@ -78,7 +78,7 @@ const toOption = (f: { id: string; name: string; category: FixtureCategory; typi
 });
 
 // Suggested default rows for a layer: fixtures whose category maps to it. This is
-// a suggestion for the picker, not a restriction — any fixture can still be added
+// a suggestion for the picker, not a restriction, any fixture can still be added
 // to any layer via allSelectableFixtures().
 export function fixturesForLayer(layer: LayerKey): FixtureOption[] {
   const cats = LAYER_FIXTURE_CATEGORIES[layer];

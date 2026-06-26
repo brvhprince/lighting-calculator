@@ -5,7 +5,7 @@ import AdminLeads from '@/components/AdminLeads';
 import { AdminGate } from '@/components/AdminGate';
 
 export const metadata: Metadata = {
-  title: 'Admin · Configuration — Penlabs Lighting Calculator',
+  title: 'Admin · Configuration, Penlabs Lighting Calculator',
   robots: { index: false, follow: false },
 };
 

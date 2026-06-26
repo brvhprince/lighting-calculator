@@ -1,7 +1,7 @@
 import { FixtureCategory, LayerKey } from '@/types';
 import { ROOM_TYPES } from '@/lib/roomTypes';
 
-// ROOM_PROFILES — the heart of the layered feature (brief §3).
+// ROOM_PROFILES, the heart of the layered feature (brief §3).
 //
 // Sources, kept deliberately traceable per §7:
 //  • ambientLux        → ROOM_TYPES[key].targetLux (single source of truth,
@@ -17,7 +17,7 @@ import { ROOM_TYPES } from '@/lib/roomTypes';
 export type TaskZone = {
   label: string; // e.g. "Workbench", "Countertop"
   // The task layer lights this zone only, NOT the whole floor (§2). Define it as
-  // a fixed work-surface area or a share of the floor — whichever is sensible.
+  // a fixed work-surface area or a share of the floor, whichever is sensible.
   fixedAreaSqFt?: number;
   areaShareOfFloor?: number; // 0–1, used when no fixed area is given
 };
@@ -26,7 +26,7 @@ export type LayerProfile = {
   fixtures: FixtureCategory[]; // candidate fixture types, best-first (auto picks [0])
   optional?: boolean;
   taskZone?: TaskZone; // task layer only
-  accentAreaShareOfFloor?: number; // accent layer only — small wash area
+  accentAreaShareOfFloor?: number; // accent layer only, small wash area
 };
 
 export type RoomProfile = {
@@ -44,7 +44,7 @@ export type RoomProfile = {
 export const ROOM_PROFILES: Record<string, RoomProfile> = {
   kitchen: {
     ambientLux: ROOM_TYPES.kitchen.targetLux ?? 300, // 300 lx general (IES residential kitchen)
-    taskLux: 500, // EN 12464-1 / IES — food prep at the counter
+    taskLux: 500, // EN 12464-1 / IES, food prep at the counter
     accentFractionOfAmbient: 0.2,
     cct: { ambient: 3000, task: 4000, accent: 2700 }, // kitchen/task 3000–4000 K (spec note)
     colorQuality: 'warm',
@@ -56,7 +56,7 @@ export const ROOM_PROFILES: Record<string, RoomProfile> = {
   },
   bedroom: {
     ambientLux: ROOM_TYPES.bedroom.targetLux ?? 100, // 100 lx general (IES bedroom)
-    taskLux: 300, // EN 12464-1 — reading/dressing zone
+    taskLux: 300, // EN 12464-1, reading/dressing zone
     accentFractionOfAmbient: 0.15,
     cct: { ambient: 2700, task: 3000, accent: 2700 }, // living/bedroom 2700 K (spec note)
     colorQuality: 'warm',
@@ -68,7 +68,7 @@ export const ROOM_PROFILES: Record<string, RoomProfile> = {
   },
   livingRoom: {
     ambientLux: ROOM_TYPES.livingRoom.targetLux ?? 100, // 100 lx general (IES living room)
-    taskLux: 300, // EN 12464-1 — reading nook
+    taskLux: 300, // EN 12464-1, reading nook
     accentFractionOfAmbient: 0.25,
     cct: { ambient: 2700, task: 3000, accent: 2700 }, // living/dining 2700 K (spec note)
     colorQuality: 'warm',
@@ -80,7 +80,7 @@ export const ROOM_PROFILES: Record<string, RoomProfile> = {
   },
   bathroom: {
     ambientLux: ROOM_TYPES.bathroom.targetLux ?? 300, // 300 lx general (IES bathroom)
-    taskLux: 500, // EN 12464-1 — mirror/grooming (the spec note: "mirrors are skin-rendering machines")
+    taskLux: 500, // EN 12464-1, mirror/grooming (the spec note: "mirrors are skin-rendering machines")
     accentFractionOfAmbient: 0.15,
     cct: { ambient: 3000, task: 3000, accent: 2700 }, // bathroom 2700–3000 K, high R9 (spec note)
     colorQuality: 'warm',
@@ -92,7 +92,7 @@ export const ROOM_PROFILES: Record<string, RoomProfile> = {
   },
   office: {
     ambientLux: ROOM_TYPES.office.targetLux ?? 400, // 400 lx general (IES home office)
-    taskLux: 500, // EN 12464-1 — desk / writing & reading (raise to 750 for fine detail)
+    taskLux: 500, // EN 12464-1, desk / writing & reading (raise to 750 for fine detail)
     accentFractionOfAmbient: 0.15,
     cct: { ambient: 4000, task: 4500, accent: 3000 }, // office/colour-critical 4000–5000 K (spec note)
     colorQuality: 'critical',
@@ -104,7 +104,7 @@ export const ROOM_PROFILES: Record<string, RoomProfile> = {
   },
   garage: {
     ambientLux: ROOM_TYPES.garage.targetLux ?? 200, // 200 lx general (IES garage/workshop ambient)
-    taskLux: 500, // EN 12464-1 — workbench (raise toward 750 for fine bench work)
+    taskLux: 500, // EN 12464-1, workbench (raise toward 750 for fine bench work)
     accentFractionOfAmbient: 0.1,
     cct: { ambient: 4000, task: 4000, accent: 4000 }, // workshop neutral/cool fine (spec note)
     colorQuality: 'utility',

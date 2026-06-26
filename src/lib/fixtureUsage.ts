@@ -4,7 +4,7 @@ import { CalculationInput } from '@/types';
 
 // Scan THIS browser's localStorage for references to a fixture id, so the admin
 // can be warned before archiving/deleting one that's in use. (Saved calcs and
-// projects are client-side, so this is per-browser — the save-time snapshot in
+// projects are client-side, so this is per-browser, the save-time snapshot in
 // milestone 5 is the real cross-device safety net.)
 
 const SAVED_KEY = 'pen-lighting-saved-calculations';

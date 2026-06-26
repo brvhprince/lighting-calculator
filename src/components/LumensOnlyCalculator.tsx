@@ -16,7 +16,7 @@ import { SavedCalculation, LumensOnlyInput, LumensOnlyResult } from '@/types/sav
 import { saveCalculation, generateCalculationId } from '@/lib/savedCalculations';
 
 export default function LumensOnlyCalculator() {
-  const [unitSystem, setUnitSystem] = useState<UnitSystem>('imperial');
+  const [unitSystem, setUnitSystem] = useState<UnitSystem>('metric');
   const [length, setLength] = useState<string>('');
   const [width, setWidth] = useState<string>('');
   const [roomType, setRoomType] = useState<string>('');
@@ -30,6 +30,27 @@ export default function LumensOnlyCalculator() {
     areaUnit: string;
   } | null>(null);
   const [description, setDescription] = useState<string>('');
+
+  // Light density is stored/computed as lumens/ft²; metric users see lumens/m²
+  // (1 lm/ft² = 10.7639 lm/m²). Editable fields keep lm/ft² internally.
+  const SQFT_PER_SQM = 10.7639;
+  const isMetric = unitSystem === 'metric';
+  const densityUnit = isMetric ? 'lm/m²' : 'lumens/ft²';
+  const densityUnitShort = isMetric ? 'lm/m²' : 'lm/ft²';
+  const perAreaLabel = isMetric ? 'Lumens per Square Metre' : 'Lumens per Square Foot';
+  const toDensity = (perSqFt: number) => (isMetric ? Math.round(perSqFt * SQFT_PER_SQM) : perSqFt);
+  const densityShown = (storedLmFt2: string) => {
+    if (!storedLmFt2) return '';
+    const n = parseFloat(storedLmFt2);
+    if (!isFinite(n)) return storedLmFt2;
+    return isMetric ? String(Math.round(n * SQFT_PER_SQM)) : storedLmFt2;
+  };
+  const densityStored = (typed: string) => {
+    if (!typed) return '';
+    const n = parseFloat(typed);
+    if (!isFinite(n)) return typed;
+    return isMetric ? String(n / SQFT_PER_SQM) : typed;
+  };
 
   const handleCalculate = () => {
     if (!length || !width || !roomType) {
@@ -186,7 +207,7 @@ export default function LumensOnlyCalculator() {
               <SelectContent>
                 {Object.entries(ROOM_TYPES).map(([key, room]) => (
                   <SelectItem key={key} value={key}>
-                    {room.name} ({room.lumensPerSqFt.recommended} lumens/ft²)
+                    {room.name} ({toDensity(room.lumensPerSqFt.recommended)} {densityUnit})
                   </SelectItem>
                 ))}
                 <SelectItem value="other">Other (Custom)</SelectItem>
@@ -214,16 +235,16 @@ export default function LumensOnlyCalculator() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="customRoomLumens-lumens">Lumens per Square Foot</Label>
+                <Label htmlFor="customRoomLumens-lumens">{perAreaLabel}</Label>
                 <Input
                   id="customRoomLumens-lumens"
                   type="number"
-                  placeholder="e.g., 30"
-                  value={customRoomLumens}
-                  onChange={(e) => setCustomRoomLumens(e.target.value)}
+                  placeholder={isMetric ? 'e.g., 320' : 'e.g., 30'}
+                  value={densityShown(customRoomLumens)}
+                  onChange={(e) => setCustomRoomLumens(densityStored(e.target.value))}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Typical range: 10-80 lumens/ft² depending on room purpose
+                  Typical range: {toDensity(10)}-{toDensity(80)} {densityUnitShort} depending on room purpose
                 </p>
               </div>
             </div>
@@ -232,17 +253,17 @@ export default function LumensOnlyCalculator() {
           {/* Custom Lumens (Optional) */}
           <div className="space-y-2">
             <Label htmlFor="customLumens-only">
-              Custom Lumens per Square Foot (optional)
+              Custom {perAreaLabel} (optional)
             </Label>
             <Input
               id="customLumens-only"
               type="number"
               placeholder="Leave empty for recommended value"
-              value={customLumens}
-              onChange={(e) => setCustomLumens(e.target.value)}
+              value={densityShown(customLumens)}
+              onChange={(e) => setCustomLumens(densityStored(e.target.value))}
             />
             <p className="text-xs text-muted-foreground">
-              Override the recommended lumens/ft² if you have specific requirements
+              Override the recommended {densityUnitShort} if you have specific requirements
             </p>
           </div>
 
@@ -292,11 +313,11 @@ export default function LumensOnlyCalculator() {
               </div>
 
               <div className="space-y-2 text-center p-6 border rounded-lg bg-primary/5">
-                <p className="text-sm text-muted-foreground">Lumens per Sq Ft</p>
+                <p className="text-sm text-muted-foreground">{perAreaLabel}</p>
                 <p className="text-3xl font-bold text-primary">
-                  {result.lumensPerSqFt}
+                  {toDensity(result.lumensPerSqFt)}
                 </p>
-                <p className="text-sm font-medium">lumens/ft²</p>
+                <p className="text-sm font-medium">{densityUnitShort}</p>
               </div>
 
               <div className="space-y-2 text-center p-6 border rounded-lg bg-primary/10">
@@ -324,7 +345,7 @@ export default function LumensOnlyCalculator() {
                 <li className="flex gap-2">
                   <span className="text-primary">•</span>
                   <span>
-                    This calculation is based on {result.lumensPerSqFt} lumens per square foot
+                    This calculation is based on {toDensity(result.lumensPerSqFt)} {densityUnitShort}
                     {roomType === 'other' && customRoomName
                       ? `, which you specified for your ${customRoomName.toLowerCase()}.`
                       : roomType !== 'other'

@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import ProjectManager from '@/components/ProjectManager';
 
 export const metadata: Metadata = {
-  title: 'Projects — Penlabs Lighting Calculator',
+  title: 'Projects | Penlabs Lighting Calculator',
   description:
     'Plan lighting for an entire home or building. Group rooms into a project, roll up fixtures and cost, and export a professional report.',
 };

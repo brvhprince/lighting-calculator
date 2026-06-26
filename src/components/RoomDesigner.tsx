@@ -229,7 +229,7 @@ export default function RoomDesigner() {
   const perimeterFt = useMemo(() => (closed ? polygonPerimeter(points) : 0), [points, closed]);
 
   // Build the SAME CalculationResult the calculator produces, from the drawn
-  // polygon's area — so the designer can render the full LightingResults stack.
+  // polygon's area, so the designer can render the full LightingResults stack.
   const designed = useMemo(() => {
     if (!closed || areaSqFt <= 0) return null;
     const ceilingFt =
@@ -807,7 +807,7 @@ export default function RoomDesigner() {
               <Pentagon className="h-5 w-5 text-brand-bronze" />
               Room Designer
             </CardTitle>
-            <CardDescription>Draw any shape to scale — grid squares are 1 {unitLabel}.</CardDescription>
+            <CardDescription>Draw any shape to scale, grid squares are 1 {unitLabel}.</CardDescription>
           </div>
           <div className="flex w-full flex-wrap items-stretch gap-2">
             <Button
@@ -892,7 +892,7 @@ export default function RoomDesigner() {
             <canvas
               ref={canvasRef}
               role="img"
-              aria-label="Room floor-plan canvas — draw and edit the room shape and fixture layout"
+              aria-label="Room floor-plan canvas, draw and edit the room shape and fixture layout"
               className="absolute inset-0 h-full w-full touch-none rounded-lg"
               style={{ cursor: mode === 'free' && !closed ? 'crosshair' : 'pointer' }}
               onPointerDown={onPointerDown}
@@ -999,7 +999,7 @@ export default function RoomDesigner() {
                 <div className="space-y-2 rounded-lg border border-border p-3">
                   <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <Ruler className="h-3.5 w-3.5" />
-                    Exact corner coordinates in {unitLabel} — corners are numbered on the plan. X is
+                    Exact corner coordinates in {unitLabel}, corners are numbered on the plan. X is
                     horizontal, Y is vertical; edge lengths update live.
                   </p>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -1097,13 +1097,13 @@ export default function RoomDesigner() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="15">15° — very narrow spot</SelectItem>
-                  <SelectItem value="24">24° — spot</SelectItem>
-                  <SelectItem value="36">36° — narrow flood</SelectItem>
-                  <SelectItem value="40">40° — medium flood</SelectItem>
-                  <SelectItem value="60">60° — flood</SelectItem>
-                  <SelectItem value="90">90° — wide flood</SelectItem>
-                  <SelectItem value="120">120° — very wide</SelectItem>
+                  <SelectItem value="15">15°, very narrow spot</SelectItem>
+                  <SelectItem value="24">24°, spot</SelectItem>
+                  <SelectItem value="36">36°, narrow flood</SelectItem>
+                  <SelectItem value="40">40°, medium flood</SelectItem>
+                  <SelectItem value="60">60°, flood</SelectItem>
+                  <SelectItem value="90">90°, wide flood</SelectItem>
+                  <SelectItem value="120">120°, very wide</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
@@ -1174,12 +1174,12 @@ export default function RoomDesigner() {
       </div>
     </div>
 
-      {/* Full shared analysis — identical to the Complete Calculator */}
+      {/* Full shared analysis, identical to the Complete Calculator */}
       {designed && (
         <>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">
-              Same lumen, zone, cost and product analysis as the Complete Calculator — from your drawn plan.
+              Same lumen, zone, cost and product analysis as the Complete Calculator, from your drawn plan.
             </p>
             <div className="flex flex-wrap gap-2">
               <Button onClick={sendToCalculator} variant="outline" className="gap-2">

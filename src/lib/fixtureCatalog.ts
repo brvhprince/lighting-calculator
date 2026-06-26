@@ -66,7 +66,7 @@ export function validateFixtures(value: unknown): string | null {
 // Efficacy band (lm/W) for the sanity-check guardrail. The cost model assumes
 // ~90 lm/W for LED (EFFICACY.led in costEstimator); fixtures far outside this
 // band usually mean a mistyped lumen or wattage. Outside the band is flagged,
-// never blocked — a save still proceeds.
+// never blocked, a save still proceeds.
 export const EFFICACY_BAND = { low: 60, high: 130 } as const;
 
 // Non-blocking data-quality warnings for the catalogue. Checks luminous efficacy
@@ -82,11 +82,11 @@ export function fixtureWarnings(items: FixtureDef[]): string[] {
     const eff = lm / w;
     if (eff < EFFICACY_BAND.low)
       out.push(
-        `${f.name}: ${Math.round(eff)} lm/W is unusually low (under ${EFFICACY_BAND.low}) — check the wattage or lumens.`
+        `${f.name}: ${Math.round(eff)} lm/W is unusually low (under ${EFFICACY_BAND.low}), check the wattage or lumens.`
       );
     else if (eff > EFFICACY_BAND.high)
       out.push(
-        `${f.name}: ${Math.round(eff)} lm/W is unusually high (over ${EFFICACY_BAND.high}) — verify the lumens or wattage.`
+        `${f.name}: ${Math.round(eff)} lm/W is unusually high (over ${EFFICACY_BAND.high}), verify the lumens or wattage.`
       );
   }
   return out;
@@ -201,7 +201,7 @@ export function resolveFixture(id: string): FixtureDef | undefined {
 }
 
 // Resolve for display, falling back to a saved snapshot (then a generic ghost)
-// when the fixture is gone — so old designs never render blank or mis-priced.
+// when the fixture is gone, so old designs never render blank or mis-priced.
 export function resolveFixtureOrGhost(
   id: string,
   snapshots?: FixtureSnapshot[]

@@ -200,7 +200,7 @@ export function CostEnergyEstimator({ result }: Props) {
           </div>
           <StatTile
             label="Payback of LED premium"
-            value={estimate.paybackYears !== null ? `${estimate.paybackYears} yrs` : '—'}
+            value={estimate.paybackYears !== null ? `${estimate.paybackYears} yrs` : '-'}
           />
           <div className="rounded-lg border border-border bg-muted/40 p-4 space-y-1">
             <p className="flex items-center gap-1.5 text-sm text-muted-foreground">

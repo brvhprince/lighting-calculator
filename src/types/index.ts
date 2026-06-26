@@ -74,7 +74,7 @@ export type FixtureDef = {
     max: number;
     recommended: number;
   };
-  wattage?: number; // nominal watts — used only to sanity-check efficacy (lm/W)
+  wattage?: number; // nominal watts, used only to sanity-check efficacy (lm/W)
   price: FixturePrice; // unit price per fixture, by currency
   priceRange?: Partial<Record<CurrencyCode, [number, number]>>; // optional shopping low/high
   archived?: boolean; // soft-deleted: hidden from pickers, still resolvable
@@ -86,7 +86,7 @@ export type FixtureDef = {
   source?: 'builtin' | 'admin' | 'user' | 'derived';
 };
 
-// Back-compat alias — fixtures used to be `FixtureSize` without id/price.
+// Back-compat alias, fixtures used to be `FixtureSize` without id/price.
 export type FixtureSize = FixtureDef;
 
 // A quantity of one catalogue fixture (by id), used in result/project breakdowns.
@@ -114,7 +114,7 @@ export type CalculationInput = {
   customLumensPerSqFt?: number;
 
   // Ceiling height (in the active unit system: feet for imperial, meters for metric).
-  // Optional — when omitted a standard 8 ft / 2.4 m ceiling is assumed.
+  // Optional, when omitted a standard 8 ft / 2.4 m ceiling is assumed.
   ceilingHeight?: number;
 
   // Vaulted / sloped ceiling: when true, ceilingPeakHeight is the high point and

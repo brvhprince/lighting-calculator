@@ -7,7 +7,7 @@ import { RoomConfigFields } from './RoomConfigFields';
 import { RoomConfigValue, SharedInputs, UnitSystem } from '@/types';
 
 // The room inputs shared by Simple and Advanced mode live in one component so
-// both calculators read/write the exact same fields — switching modes (or
+// both calculators read/write the exact same fields, switching modes (or
 // restoring a save) never loses or diverges the inputs.
 export type { SharedInputs };
 

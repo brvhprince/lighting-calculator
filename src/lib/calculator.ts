@@ -70,7 +70,8 @@ export function buildLightingResult(p: AreaLightingParams): CalculationResult {
     lumensPerFixture,
     totalLumensNeeded,
     p.ceilingHeightFt,
-    ceilingFactor
+    ceilingFactor,
+    p.unitSystem
   );
 
   return {
@@ -324,15 +325,31 @@ function generateRecommendations(
   lumensPerFixture: number,
   totalLumensNeeded: number,
   ceilingHeightFt: number,
-  ceilingFactor: number
+  ceilingFactor: number,
+  unitSystem: UnitSystem
 ): string[] {
   const recommendations: string[] = [];
+
+  // Display helpers so the copy reads in the user's unit system.
+  const metric = unitSystem === 'metric';
+  const FT_TO_M = 0.3048;
+  const SQFT_PER_SQM = 10.7639;
+  const densityUnit = metric ? 'lumens per square metre' : 'lumens per square foot';
+  const areaText = metric
+    ? `${(areaInSqFt * SQ_FT_TO_SQ_M).toFixed(1)} m²`
+    : `${Math.round(areaInSqFt)} sq ft`;
+  const ceilText = (ft: number) => (metric ? `${(ft * FT_TO_M).toFixed(1)} m` : `${ft.toFixed(1)} ft`);
+  const standardCeil = metric ? '2.4 m' : '8 ft';
+  const tallCeil = metric ? '3 m' : '10 ft';
 
   const roomType = ROOM_TYPES[input.roomType];
 
   if (roomType) {
+    const density = metric
+      ? Math.round(roomType.lumensPerSqFt.recommended * SQFT_PER_SQM)
+      : roomType.lumensPerSqFt.recommended;
     recommendations.push(
-      `For a ${roomType.name.toLowerCase()}, the recommended lighting is ${roomType.lumensPerSqFt.recommended} lumens per square foot.`
+      `For a ${roomType.name.toLowerCase()}, the recommended lighting is ${density} ${densityUnit}.`
     );
   }
 
@@ -341,7 +358,7 @@ function generateRecommendations(
   );
 
   recommendations.push(
-    `Total light output: ${totalLumensNeeded.toLocaleString()} lumens for ${Math.round(areaInSqFt)} sq ft.`
+    `Total light output: ${totalLumensNeeded.toLocaleString()} lumens for ${areaText}.`
   );
 
   if (!input.customFixtureLumens) {
@@ -357,7 +374,7 @@ function generateRecommendations(
   // Ceiling-height guidance
   if (ceilingFactor > 1) {
     recommendations.push(
-      `Your ${ceilingHeightFt.toFixed(1)} ft ceiling raises the required output by ${Math.round((ceilingFactor - 1) * 100)}% versus a standard 8 ft ceiling — already factored into the totals above.`
+      `Your ${ceilText(ceilingHeightFt)} ceiling raises the required output by ${Math.round((ceilingFactor - 1) * 100)}% versus a standard ${standardCeil} ceiling, already factored into the totals above.`
     );
   }
   if (input.naturalLight === 'ample') {
@@ -372,7 +389,7 @@ function generateRecommendations(
 
   if (ceilingHeightFt >= 10) {
     recommendations.push(
-      'For ceilings 10 ft and higher, choose fixtures with a narrower beam angle (≤40°) or higher lumen output to keep light from dispersing before it reaches the floor.'
+      `For ceilings ${tallCeil} and higher, choose fixtures with a narrower beam angle (≤40°) or higher lumen output to keep light from dispersing before it reaches the floor.`
     );
   } else if (ceilingHeightFt < 8) {
     recommendations.push(

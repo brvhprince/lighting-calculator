@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Project Report — Penlabs',
+  title: 'Project Report, Penlabs',
   robots: { index: false, follow: false },
 };
 
@@ -35,7 +35,7 @@ export default async function SharedReportPage({ params }: { params: Promise<{ c
     const row = await prisma.sharedProject.findUnique({ where: { code } });
     if (row) project = { name: row.name, client: row.client, updatedAt: row.updatedAt, data: row.data as SharedData };
   } catch {
-    /* DB unreachable — handled below */
+    /* DB unreachable, handled below */
   }
 
   if (!project) {
@@ -110,7 +110,7 @@ export default async function SharedReportPage({ params }: { params: Promise<{ c
       </Card>
 
       <p className="text-center text-xs text-muted-foreground">
-        Penlabs Lighting · a Pen Homes company — intentional, invisible technology.
+        Penlabs Lighting · a Pen Homes company. Intentional, invisible technology.
       </p>
     </div>
   );
