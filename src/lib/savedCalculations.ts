@@ -14,9 +14,12 @@ export function getSavedCalculations(): SavedCalculation[] {
   }
 }
 
+// Insert a new calculation, or replace one with the same id (updating in place,
+// moved to the front as the most recent). "Save as new" passes a fresh id;
+// "Save changes" reuses the loaded id to overwrite.
 export function saveCalculation(calculation: SavedCalculation): void {
   try {
-    const saved = getSavedCalculations();
+    const saved = getSavedCalculations().filter((c) => c.id !== calculation.id);
     const updated = [calculation, ...saved];
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
   } catch (error) {

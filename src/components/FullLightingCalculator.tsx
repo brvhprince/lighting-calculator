@@ -6,19 +6,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
-import { Calculator, Grid3x3, Save, Wand2, Share2, Check, Pentagon } from 'lucide-react';
-import { ROOM_TYPES } from '@/lib/roomTypes';
+import { Calculator, Grid3x3, Save, Wand2, Share2, Check, Pentagon, Copy } from 'lucide-react';
 import { ROOM_PRESETS, presetDimensions, RoomPreset } from '@/lib/roomPresets';
 import { calculateLighting, dimToFeet } from '@/lib/calculator';
 import { rectangleShape } from '@/lib/geometry';
 import { buildCalculationInput } from '@/lib/roomConfig';
 import { track } from '@/lib/analytics';
 import { CalculationInput, CalculationResult, RoomConfigValue, UnitSystem } from '@/types';
-import { SavedCalculation } from '@/types/saved-calculations';
-import { saveCalculation, generateCalculationId } from '@/lib/savedCalculations';
 import { PDFExport } from './PDFExport';
 import { buildShareUrl, buildDesignerUrl, DesignerState } from '@/lib/shareUrl';
-import { snapshotFixtures } from '@/lib/fixtureCatalog';
 import { LightingResults } from './LightingResults';
 import { RoomInputs, SharedInputs } from './RoomInputs';
 
@@ -31,6 +27,11 @@ type Props = {
   onConfig: (patch: Partial<RoomConfigValue>) => void;
   result: CalculationResult | null;
   setResult: (r: CalculationResult | null) => void;
+  description: string;
+  onDescription: (v: string) => void;
+  loadedId: string | null;
+  onSaveNew: () => void;
+  onSaveChanges: () => void;
 };
 
 export default function FullLightingCalculator({
@@ -42,10 +43,14 @@ export default function FullLightingCalculator({
   onConfig,
   result,
   setResult,
+  description,
+  onDescription,
+  loadedId,
+  onSaveNew,
+  onSaveChanges,
 }: Props) {
   const router = useRouter();
   const { unitSystem, length, width, config } = shared;
-  const [description, setDescription] = useState('');
   const [shareCopied, setShareCopied] = useState(false);
 
   const buildInput = useCallback((): CalculationInput => buildCalculationInput(shared), [shared]);
@@ -93,27 +98,18 @@ export default function FullLightingCalculator({
     track('calculate', { room: config.roomType, unit: unitSystem });
   };
 
-  const handleSave = () => {
-    if (!result) return;
-
-    const roomName =
-      config.roomType === 'other' && config.customRoomName
-        ? config.customRoomName
-        : ROOM_TYPES[config.roomType]?.name || 'Room';
-    const savedCalc: SavedCalculation = {
-      id: generateCalculationId(),
-      name: `${roomName} - ${result.area.toFixed(0)} ${result.areaUnit}`,
-      description: description.trim() || undefined,
-      timestamp: Date.now(),
-      type: 'full',
-      mode: 'simple',
-      input: buildInput(),
-      result,
-      fixtureSnapshot: snapshotFixtures((result.fixtureItems ?? []).map((i) => i.id)),
-    };
-
-    saveCalculation(savedCalc);
-    alert('Calculation saved successfully!');
+  const [savedNote, setSavedNote] = useState('');
+  const flashSaved = (msg: string) => {
+    setSavedNote(msg);
+    setTimeout(() => setSavedNote(''), 2000);
+  };
+  const handleSaveNew = () => {
+    onSaveNew();
+    flashSaved(loadedId ? 'Saved as a new copy' : 'Saved');
+  };
+  const handleSaveChanges = () => {
+    onSaveChanges();
+    flashSaved('Changes saved');
   };
 
   const applyPreset = (preset: RoomPreset) => {
@@ -195,7 +191,7 @@ export default function FullLightingCalculator({
                 type="text"
                 placeholder="e.g., Master bedroom closet, Guest room"
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={(e) => onDescription(e.target.value)}
               />
             </div>
             <Button onClick={openInDesigner} variant="outline" className="gap-2">
@@ -211,11 +207,27 @@ export default function FullLightingCalculator({
               roomType={config.roomType}
               customRoomName={config.roomType === 'other' ? config.customRoomName : undefined}
             />
-            <Button onClick={handleSave} variant="default" className="gap-2">
-              <Save className="h-4 w-4" />
-              Save Calculation
-            </Button>
+            {loadedId ? (
+              <>
+                <Button onClick={handleSaveNew} variant="outline" className="gap-2">
+                  <Copy className="h-4 w-4" />
+                  Save as new
+                </Button>
+                <Button onClick={handleSaveChanges} variant="default" className="gap-2">
+                  <Save className="h-4 w-4" />
+                  Save changes
+                </Button>
+              </>
+            ) : (
+              <Button onClick={handleSaveNew} variant="default" className="gap-2">
+                <Save className="h-4 w-4" />
+                Save Calculation
+              </Button>
+            )}
           </div>
+          {savedNote && (
+            <p className="text-right text-xs font-medium text-brand-sage">{savedNote}</p>
+          )}
           <LightingResults
             result={result}
             roomType={config.roomType}

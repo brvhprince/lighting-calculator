@@ -1,12 +1,17 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Calculator, Layers } from 'lucide-react';
+import { Calculator, Layers, FilePlus2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import { track } from '@/lib/analytics';
 import { calculateLighting, dimToFeet } from '@/lib/calculator';
 import { decodeInput } from '@/lib/shareUrl';
-import { CalculationInput, CalculationResult, FixtureSnapshot, RoomConfigValue, SharedInputs, UnitSystem } from '@/types';
+import { ROOM_TYPES } from '@/lib/roomTypes';
+import { buildCalculationInput } from '@/lib/roomConfig';
+import { saveCalculation, generateCalculationId } from '@/lib/savedCalculations';
+import { snapshotFixtures } from '@/lib/fixtureCatalog';
+import { CalculationInput, CalculationResult, FixtureDef, FixtureSnapshot, RoomConfigValue, SharedInputs, UnitSystem } from '@/types';
 import { AdvancedState, SavedCalculation } from '@/types/saved-calculations';
 import { defaultRoomConfig } from './RoomConfigFields';
 import { SavedCalculations } from './SavedCalculations';
@@ -37,6 +42,10 @@ export default function LightingCalculatorShell() {
   const [advanced, setAdvanced] = useState<AdvancedState>(defaultAdvanced);
   const [result, setResult] = useState<CalculationResult | null>(null);
   const [snapshot, setSnapshot] = useState<FixtureSnapshot[] | undefined>(undefined);
+  const [description, setDescription] = useState('');
+  // The id of the restored save currently being edited (null = unsaved/new), so
+  // we can offer "Save changes" (overwrite) alongside "Save as new".
+  const [loadedId, setLoadedId] = useState<string | null>(null);
   const { registerDesignFixtures } = useFixtures();
 
   const onUnitSystem = (unitSystem: UnitSystem) => setShared((s) => ({ ...s, unitSystem }));
@@ -50,7 +59,78 @@ export default function LightingCalculatorShell() {
     if (next === mode) return;
     setMode(next);
     setResult(null); // a result belongs to the mode that produced it
+    setLoadedId(null); // and so does the "editing a save" link
     track('lighting_mode', { mode: next });
+  };
+
+  // Build a SavedCalculation for the current mode/inputs/result under a given id.
+  const buildSaved = (id: string): SavedCalculation | null => {
+    if (!result) return null;
+    const { config } = shared;
+    const roomName =
+      config.roomType === 'other' && config.customRoomName
+        ? config.customRoomName
+        : ROOM_TYPES[config.roomType]?.name || 'Room';
+    const suffix = mode === 'advanced' ? ' (layered)' : '';
+    const ids = (result.fixtureItems ?? []).map((i) => i.id);
+    const fresh = snapshotFixtures(ids);
+    // Keep snapshots for still-referenced fixtures no longer in the catalogue.
+    const carried = (snapshot ?? []).filter(
+      (s) => ids.includes(s.id) && !fresh.some((f) => f.id === s.id)
+    );
+    const base: SavedCalculation = {
+      id,
+      name: `${roomName}${suffix} - ${result.area.toFixed(0)} ${result.areaUnit}`,
+      description: description.trim() || undefined,
+      timestamp: Date.now(),
+      type: 'full',
+      mode,
+      input: buildCalculationInput(shared),
+      result,
+      fixtureSnapshot: [...fresh, ...carried],
+    };
+    if (mode !== 'advanced') return base;
+    // Advanced: carry only custom/derived fixtures still referenced.
+    const referenced = new Set<string>();
+    for (const map of Object.values(advanced.fixtureCounts)) {
+      for (const [k, q] of Object.entries(map)) if (q > 0) referenced.add(k);
+    }
+    const customFixtures = (advanced.customFixtures ?? []).filter((f: FixtureDef) =>
+      referenced.has(f.id)
+    );
+    return {
+      ...base,
+      advanced: { ...advanced, customFixtures: customFixtures.length ? customFixtures : undefined },
+    };
+  };
+
+  const onSaveNew = () => {
+    const calc = buildSaved(generateCalculationId());
+    if (!calc) return;
+    saveCalculation(calc);
+    setLoadedId(calc.id); // the new save becomes the one we're editing
+    track('save_calculation', { mode, kind: 'new' });
+  };
+
+  const onSaveChanges = () => {
+    if (!loadedId) return;
+    const calc = buildSaved(loadedId);
+    if (!calc) return;
+    saveCalculation(calc);
+    track('save_calculation', { mode, kind: 'update' });
+  };
+
+  // Reset everything to a blank slate, keeping the current mode.
+  const onStartNew = () => {
+    if (result && !window.confirm('Start a new calculation? Any unsaved changes will be lost.')) {
+      return;
+    }
+    setShared(defaultShared());
+    setAdvanced(defaultAdvanced());
+    setResult(null);
+    setSnapshot(undefined);
+    setDescription('');
+    setLoadedId(null);
   };
 
   // Rehydrate the shared inputs from a stored CalculationInput.
@@ -104,6 +184,8 @@ export default function LightingCalculatorShell() {
     // resolve them by id immediately on restore.
     if (calc.advanced?.customFixtures?.length) registerDesignFixtures(calc.advanced.customFixtures);
     setSnapshot(calc.fixtureSnapshot);
+    setDescription(calc.description ?? '');
+    setLoadedId(calc.id); // mark this as the save we're now editing
     setMode(loadedMode);
     setResult(calc.result as CalculationResult);
   };
@@ -146,7 +228,13 @@ export default function LightingCalculatorShell() {
           </button>
         </div>
 
-        <SavedCalculations onLoad={handleLoad} />
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={onStartNew} className="gap-1.5">
+            <FilePlus2 className="h-4 w-4" />
+            Start new
+          </Button>
+          <SavedCalculations onLoad={handleLoad} />
+        </div>
       </div>
 
       {mode === 'simple' ? (
@@ -159,6 +247,11 @@ export default function LightingCalculatorShell() {
           onConfig={onConfig}
           result={result}
           setResult={setResult}
+          description={description}
+          onDescription={setDescription}
+          loadedId={loadedId}
+          onSaveNew={onSaveNew}
+          onSaveChanges={onSaveChanges}
         />
       ) : (
         <AdvancedLightingCalculator
@@ -173,6 +266,11 @@ export default function LightingCalculatorShell() {
           result={result}
           setResult={setResult}
           snapshot={snapshot}
+          description={description}
+          onDescription={setDescription}
+          loadedId={loadedId}
+          onSaveNew={onSaveNew}
+          onSaveChanges={onSaveChanges}
         />
       )}
     </div>

@@ -29,9 +29,9 @@ import {
   Pencil,
   Trash2,
   PlusCircle,
+  Copy,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ROOM_TYPES } from '@/lib/roomTypes';
 import { calculateLighting } from '@/lib/calculator';
 import { buildCalculationInput } from '@/lib/roomConfig';
 import { track } from '@/lib/analytics';
@@ -43,15 +43,9 @@ import {
   RoomConfigValue,
   UnitSystem,
 } from '@/types';
-import { AdvancedState, SavedCalculation } from '@/types/saved-calculations';
-import { saveCalculation, generateCalculationId } from '@/lib/savedCalculations';
+import { AdvancedState } from '@/types/saved-calculations';
 import { buildShareUrl } from '@/lib/shareUrl';
-import {
-  resolveFixture,
-  resolveFixtureOrGhost,
-  snapshotFixtures,
-  fixturePrice,
-} from '@/lib/fixtureCatalog';
+import { resolveFixture, resolveFixtureOrGhost, fixturePrice } from '@/lib/fixtureCatalog';
 import { useFixtures } from '@/context/FixturesProvider';
 import { useCurrency } from '@/context/CurrencyProvider';
 import { CurrencyCode } from '@/config/markets';
@@ -91,6 +85,11 @@ type Props = {
   // Fixture snapshot from a restored save — lets discontinued fixtures still
   // render (ghost) and be remapped.
   snapshot?: FixtureSnapshot[];
+  description: string;
+  onDescription: (v: string) => void;
+  loadedId: string | null;
+  onSaveNew: () => void;
+  onSaveChanges: () => void;
 };
 
 type LayerView = {
@@ -127,11 +126,16 @@ export default function AdvancedLightingCalculator({
   result,
   setResult,
   snapshot,
+  description,
+  onDescription,
+  loadedId,
+  onSaveNew,
+  onSaveChanges,
 }: Props) {
   const { length, width, unitSystem, config } = shared;
-  const [description, setDescription] = useState('');
   const [view, setView] = useState<AdvancedView | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
+  const [savedNote, setSavedNote] = useState('');
 
   const { selectedLayers, fixtureCounts } = advanced;
   const { addPersonalFixture, registerDesignFixtures } = useFixtures();
@@ -372,44 +376,17 @@ export default function AdvancedLightingCalculator({
     });
   };
 
-  const handleSave = () => {
-    if (!view || !result) return;
-    const ids = (result.fixtureItems ?? []).map((i) => i.id);
-    const fresh = snapshotFixtures(ids);
-    // Keep snapshots for still-referenced fixtures that are no longer in the catalogue.
-    const carried = (snapshot ?? []).filter(
-      (s) => ids.includes(s.id) && !fresh.some((f) => f.id === s.id)
-    );
-    const fixtureSnapshot = [...fresh, ...carried];
-    // Carry only custom/derived fixtures the design still references inline, so a
-    // restore on any browser rebuilds them without dragging orphans along.
-    const referencedIds = new Set<string>();
-    for (const map of Object.values(advanced.fixtureCounts)) {
-      for (const [k, q] of Object.entries(map)) if (q > 0) referencedIds.add(k);
-    }
-    const customFixtures = (advanced.customFixtures ?? []).filter((f) => referencedIds.has(f.id));
-    const prunedAdvanced: AdvancedState = {
-      ...advanced,
-      customFixtures: customFixtures.length ? customFixtures : undefined,
-    };
-    const roomName =
-      config.roomType === 'other' && config.customRoomName
-        ? config.customRoomName
-        : ROOM_TYPES[config.roomType]?.name || 'Room';
-    const saved: SavedCalculation = {
-      id: generateCalculationId(),
-      name: `${roomName} (layered) - ${result.area.toFixed(0)} ${result.areaUnit}`,
-      description: description.trim() || undefined,
-      timestamp: Date.now(),
-      type: 'full',
-      mode: 'advanced',
-      input: buildCalculationInput(shared),
-      result,
-      advanced: prunedAdvanced,
-      fixtureSnapshot,
-    };
-    saveCalculation(saved);
-    alert('Layered design saved successfully!');
+  const flashSaved = (msg: string) => {
+    setSavedNote(msg);
+    setTimeout(() => setSavedNote(''), 2000);
+  };
+  const handleSaveNew = () => {
+    onSaveNew();
+    flashSaved(loadedId ? 'Saved as a new copy' : 'Saved');
+  };
+  const handleSaveChanges = () => {
+    onSaveChanges();
+    flashSaved('Changes saved');
   };
 
   const handleShare = async () => {
@@ -582,7 +559,7 @@ export default function AdvancedLightingCalculator({
                 type="text"
                 placeholder="e.g., Kitchen layered scheme"
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={(e) => onDescription(e.target.value)}
               />
             </div>
             <Button onClick={handleShare} variant="outline" className="gap-2">
@@ -594,11 +571,27 @@ export default function AdvancedLightingCalculator({
               roomType={config.roomType}
               customRoomName={config.roomType === 'other' ? config.customRoomName : undefined}
             />
-            <Button onClick={handleSave} variant="default" className="gap-2">
-              <Save className="h-4 w-4" />
-              Save Design
-            </Button>
+            {loadedId ? (
+              <>
+                <Button onClick={handleSaveNew} variant="outline" className="gap-2">
+                  <Copy className="h-4 w-4" />
+                  Save as new
+                </Button>
+                <Button onClick={handleSaveChanges} variant="default" className="gap-2">
+                  <Save className="h-4 w-4" />
+                  Save changes
+                </Button>
+              </>
+            ) : (
+              <Button onClick={handleSaveNew} variant="default" className="gap-2">
+                <Save className="h-4 w-4" />
+                Save Design
+              </Button>
+            )}
           </div>
+          {savedNote && (
+            <p className="text-right text-xs font-medium text-brand-sage">{savedNote}</p>
+          )}
 
           <LightingResults
             result={result}
