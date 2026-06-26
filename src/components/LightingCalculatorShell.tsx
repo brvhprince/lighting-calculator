@@ -12,6 +12,7 @@ import { defaultRoomConfig } from './RoomConfigFields';
 import { SavedCalculations } from './SavedCalculations';
 import FullLightingCalculator from './FullLightingCalculator';
 import AdvancedLightingCalculator from './AdvancedLightingCalculator';
+import { useFixtures } from '@/context/FixturesProvider';
 
 type Mode = 'simple' | 'advanced';
 
@@ -36,6 +37,7 @@ export default function LightingCalculatorShell() {
   const [advanced, setAdvanced] = useState<AdvancedState>(defaultAdvanced);
   const [result, setResult] = useState<CalculationResult | null>(null);
   const [snapshot, setSnapshot] = useState<FixtureSnapshot[] | undefined>(undefined);
+  const { registerDesignFixtures } = useFixtures();
 
   const onUnitSystem = (unitSystem: UnitSystem) => setShared((s) => ({ ...s, unitSystem }));
   const onLength = (length: string) => setShared((s) => ({ ...s, length }));
@@ -98,6 +100,9 @@ export default function LightingCalculatorShell() {
     applyInput(calc.input as CalculationInput);
     const loadedMode: Mode = calc.mode === 'advanced' ? 'advanced' : 'simple';
     setAdvanced(calc.advanced ?? defaultAdvanced());
+    // Register the design's custom/derived fixtures so cost, shopping and PDF
+    // resolve them by id immediately on restore.
+    if (calc.advanced?.customFixtures?.length) registerDesignFixtures(calc.advanced.customFixtures);
     setSnapshot(calc.fixtureSnapshot);
     setMode(loadedMode);
     setResult(calc.result as CalculationResult);

@@ -17,13 +17,28 @@ import { NaturalLightLevel, UnitSystem, RoomConfigValue, FixtureCategory } from 
 
 const FIXTURE_CATEGORY_LABELS: Record<FixtureCategory, string> = {
   recessed: 'Recessed downlights',
+  flush: 'Flush / semi-flush ceiling',
   pendant: 'Pendants',
   track: 'Track',
   linear: 'Linear / surface',
+  undercabinet: 'Under-cabinet / cove',
   sconce: 'Wall sconces',
+  vanity: 'Vanity / mirror lights',
+  lamp: 'Table / floor lamps',
   strip: 'LED strip',
 };
-const FIXTURE_CATEGORY_ORDER: FixtureCategory[] = ['recessed', 'pendant', 'track', 'linear', 'sconce', 'strip'];
+const FIXTURE_CATEGORY_ORDER: FixtureCategory[] = [
+  'recessed',
+  'flush',
+  'pendant',
+  'track',
+  'linear',
+  'undercabinet',
+  'sconce',
+  'vanity',
+  'lamp',
+  'strip',
+];
 import { ArrowUpDown } from 'lucide-react';
 
 export type { RoomConfigValue };

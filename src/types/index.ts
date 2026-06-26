@@ -41,7 +41,17 @@ export type RoomType = {
   targetLux?: number;
 };
 
-export type FixtureCategory = 'recessed' | 'pendant' | 'track' | 'linear' | 'sconce' | 'strip';
+export type FixtureCategory =
+  | 'recessed'
+  | 'flush'
+  | 'pendant'
+  | 'track'
+  | 'linear'
+  | 'undercabinet'
+  | 'sconce'
+  | 'vanity'
+  | 'lamp'
+  | 'strip';
 
 // The three lighting layers (layman-first labels live in the UI). See the
 // layered-lighting brief §1.
@@ -69,6 +79,11 @@ export type FixtureDef = {
   priceRange?: Partial<Record<CurrencyCode, [number, number]>>; // optional shopping low/high
   archived?: boolean; // soft-deleted: hidden from pickers, still resolvable
   builtIn?: boolean; // seeded in code (guards permanent delete)
+  // Provenance, used by the layered UI to badge/filter fixtures and to decide
+  // what is reusable vs design-local. Absent is treated as 'builtin'/'admin'.
+  //   user    = added by a non-admin user, persisted to the personal catalogue
+  //   derived = an inline override of another fixture, lives only on its design
+  source?: 'builtin' | 'admin' | 'user' | 'derived';
 };
 
 // Back-compat alias — fixtures used to be `FixtureSize` without id/price.

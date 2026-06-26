@@ -86,6 +86,30 @@ export const BUILTIN_FIXTURES: FixtureDef[] = [
     builtIn: true,
   },
 
+  // ---- Flush / semi-flush ceiling ----
+  // US: Home Depot / Lowe's LED flush mounts (11"–15"), commodity $18–70.
+  // GH: Jumia / Melcom round LED ceiling panels 18–36W, GH₵110–550. Med conf.
+  {
+    id: 'flushSmall',
+    name: 'Flush mount ceiling (small)',
+    category: 'flush',
+    typicalLumens: { min: 1200, max: 1800, recommended: 1500 },
+    wattage: 18,
+    price: { USD: 28, GHS: 180 },
+    priceRange: { USD: [18, 45], GHS: [110, 320] },
+    builtIn: true,
+  },
+  {
+    id: 'flushLarge',
+    name: 'Flush mount ceiling (large)',
+    category: 'flush',
+    typicalLumens: { min: 1800, max: 3000, recommended: 2400 },
+    wattage: 30,
+    price: { USD: 40, GHS: 300 },
+    priceRange: { USD: [25, 70], GHS: [180, 550] },
+    builtIn: true,
+  },
+
   // ---- Pendants ----
   {
     id: 'pendantSmall',
@@ -142,6 +166,20 @@ export const BUILTIN_FIXTURES: FixtureDef[] = [
     builtIn: true,
   },
 
+  // ---- Under-cabinet / cove ----
+  // US: Home Depot linkable LED under-cabinet bars (~18"), $15–45.
+  // GH: imported LED bars / channel, GH₵90–300. Med-low conf.
+  {
+    id: 'underCabinet',
+    name: 'Under-cabinet bar (18 in)',
+    category: 'undercabinet',
+    typicalLumens: { min: 400, max: 800, recommended: 600 },
+    wattage: 8,
+    price: { USD: 26, GHS: 150 },
+    priceRange: { USD: [15, 45], GHS: [90, 300] },
+    builtIn: true,
+  },
+
   // ---- Wall sconce ----
   {
     id: 'sconce',
@@ -151,6 +189,44 @@ export const BUILTIN_FIXTURES: FixtureDef[] = [
     wattage: 7,
     price: { USD: 35, GHS: 400 },
     priceRange: { USD: [15, 90], GHS: [100, 870] },
+    builtIn: true,
+  },
+
+  // ---- Vanity / mirror light ----
+  // US: Home Depot 24" 3-light LED vanity bars, $30–120.
+  // GH: Jumia / Supply Master mirror / vanity bars, GH₵150–650. Med conf.
+  {
+    id: 'vanityBar',
+    name: 'Vanity bar (24 in)',
+    category: 'vanity',
+    typicalLumens: { min: 900, max: 2000, recommended: 1500 },
+    wattage: 18,
+    price: { USD: 55, GHS: 320 },
+    priceRange: { USD: [25, 120], GHS: [150, 650] },
+    builtIn: true,
+  },
+
+  // ---- Table / floor lamps (portable) ----
+  // Plug-in fixtures; lumens reflect the bulb they typically ship with.
+  // US: Amazon / Home Depot. GH: Jumia / Melcom. Med-low conf.
+  {
+    id: 'tableLamp',
+    name: 'Table lamp',
+    category: 'lamp',
+    typicalLumens: { min: 450, max: 1100, recommended: 800 },
+    wattage: 9,
+    price: { USD: 35, GHS: 250 },
+    priceRange: { USD: [15, 80], GHS: [90, 600] },
+    builtIn: true,
+  },
+  {
+    id: 'floorLamp',
+    name: 'Floor lamp',
+    category: 'lamp',
+    typicalLumens: { min: 1500, max: 3500, recommended: 2500 },
+    wattage: 25,
+    price: { USD: 70, GHS: 600 },
+    priceRange: { USD: [30, 160], GHS: [250, 1400] },
     builtIn: true,
   },
 

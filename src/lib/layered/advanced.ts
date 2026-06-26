@@ -15,12 +15,13 @@ export const LAYER_BUDGET_SHARE: Record<LayerKey, number> = {
   accent: 0.1,
 };
 
-// Which fixture families belong to each layer (brief §1, mapped to the existing
-// fixture categories). The user picks specific sizes within these.
+// Which fixture families are suggested as default rows for each layer (brief §1).
+// A category may appear under more than one layer; this is a suggestion, not a
+// restriction, since any fixture can be added to any layer.
 export const LAYER_FIXTURE_CATEGORIES: Record<LayerKey, FixtureCategory[]> = {
-  ambient: ['recessed', 'pendant', 'linear'],
-  task: ['track', 'linear'],
-  accent: ['sconce', 'strip'],
+  ambient: ['recessed', 'flush', 'pendant', 'linear'],
+  task: ['track', 'linear', 'undercabinet', 'vanity', 'lamp'],
+  accent: ['sconce', 'strip', 'undercabinet'],
 };
 
 // On-target band: within ±10% of target is "on target"; beyond ±25% is flagged
@@ -65,12 +66,39 @@ export function suggestedLayerLumens(
   return out;
 }
 
-// Fixture presets available to a layer, each with its recommended lumens.
-export function fixturesForLayer(layer: LayerKey): { key: string; name: string; lumens: number }[] {
+// A fixture offered in a picker: its catalogue id (key), display name, the
+// lumens it contributes, and its category (for grouping in the "add" menu).
+export type FixtureOption = { key: string; name: string; lumens: number; category: FixtureCategory };
+
+const toOption = (f: { id: string; name: string; category: FixtureCategory; typicalLumens: { recommended: number } }): FixtureOption => ({
+  key: f.id,
+  name: f.name,
+  lumens: f.typicalLumens.recommended,
+  category: f.category,
+});
+
+// Suggested default rows for a layer: fixtures whose category maps to it. This is
+// a suggestion for the picker, not a restriction — any fixture can still be added
+// to any layer via allSelectableFixtures().
+export function fixturesForLayer(layer: LayerKey): FixtureOption[] {
   const cats = LAYER_FIXTURE_CATEGORIES[layer];
   return getActiveFixtures()
     .filter((f) => cats.includes(f.category))
-    .map((f) => ({ key: f.id, name: f.name, lumens: f.typicalLumens.recommended }));
+    .map(toOption);
+}
+
+// Every active fixture (built-in, admin, personal, registered design), for the
+// "add any fixture to this layer" menu. No category gating.
+export function allSelectableFixtures(): FixtureOption[] {
+  return getActiveFixtures().map(toOption);
+}
+
+// The layer a category is suggested for (first match), used to label fixtures in
+// the cross-layer "add" menu. Undefined when a category maps to no layer.
+export function suggestedLayerForCategory(category: FixtureCategory): LayerKey | undefined {
+  return (Object.keys(LAYER_FIXTURE_CATEGORIES) as LayerKey[]).find((l) =>
+    LAYER_FIXTURE_CATEGORIES[l].includes(category)
+  );
 }
 
 // User selection: per layer, a map of fixture preset key → quantity.

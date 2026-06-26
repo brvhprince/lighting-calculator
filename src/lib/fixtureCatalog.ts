@@ -10,12 +10,16 @@ export type ResolvedFixture = FixtureDef & { missing?: boolean };
 // catalogue (edited built-ins + additions); it is merged over the built-ins.
 export type FixtureStore = { items: FixtureDef[] };
 
-const FIXTURE_CATEGORIES: FixtureCategory[] = [
+export const FIXTURE_CATEGORIES: FixtureCategory[] = [
   'recessed',
+  'flush',
   'pendant',
   'track',
   'linear',
+  'undercabinet',
   'sconce',
+  'vanity',
+  'lamp',
   'strip',
 ];
 
@@ -94,24 +98,59 @@ export function fixtureWarnings(items: FixtureDef[]): string[] {
 // (calculator, layered/advanced) read from here instead of importing a constant,
 // so a single source stays in sync everywhere.
 
+// The registry is assembled from ordered layers, each winning over the previous
+// by id: built-ins (code) < admin overrides (server) < personal fixtures (a
+// non-admin user's localStorage catalogue) < design fixtures (transient custom
+// and derived/override fixtures referenced by the open layered design). Keeping
+// the layers separate means an admin reconcile (setFixtureCatalog) re-merges the
+// personal and design layers on top instead of wiping them.
+let adminLayer: FixtureDef[] = [];
+let personalLayer: FixtureDef[] = [];
+let designLayer: FixtureDef[] = [];
+
 let catalog: FixtureDef[] = BUILTIN_FIXTURES;
 let byId: Map<string, FixtureDef> = new Map(BUILTIN_FIXTURES.map((f) => [f.id, f]));
 
-// Merge admin overrides/additions over the built-ins by id (built-ins can be
-// edited but never disappear from code). Called by FixturesProvider on load.
-export function setFixtureCatalog(items: FixtureDef[]): void {
+function rebuild(): void {
   const merged = new Map<string, FixtureDef>(BUILTIN_FIXTURES.map((f) => [f.id, f]));
-  for (const item of items) {
-    const base = merged.get(item.id);
-    merged.set(item.id, base ? { ...base, ...item, id: item.id } : { ...item, builtIn: false });
+  for (const layer of [adminLayer, personalLayer, designLayer]) {
+    for (const item of layer) {
+      const base = merged.get(item.id);
+      merged.set(item.id, base ? { ...base, ...item, id: item.id } : { ...item, builtIn: false });
+    }
   }
   byId = merged;
   catalog = Array.from(merged.values());
 }
 
+// Set the admin override/addition layer (built-ins can be edited but never
+// disappear from code). Called by FixturesProvider on load.
+export function setFixtureCatalog(items: FixtureDef[]): void {
+  adminLayer = items;
+  rebuild();
+}
+
+// Clear only the admin layer. Personal and design fixtures stay registered.
 export function resetFixtureCatalog(): void {
-  catalog = BUILTIN_FIXTURES;
-  byId = new Map(BUILTIN_FIXTURES.map((f) => [f.id, f]));
+  adminLayer = [];
+  rebuild();
+}
+
+// Set the personal-catalogue layer (a non-admin user's reusable custom fixtures).
+export function setPersonalFixtures(items: FixtureDef[]): void {
+  personalLayer = items;
+  rebuild();
+}
+
+// Register transient design fixtures (custom + derived/override) so they resolve
+// by id everywhere (cost, shopping, PDF) while a design is open. Merges by id;
+// does not wipe previously registered design fixtures.
+export function registerFixtures(items: FixtureDef[]): void {
+  if (!items.length) return;
+  const map = new Map(designLayer.map((f) => [f.id, f]));
+  for (const it of items) map.set(it.id, it);
+  designLayer = Array.from(map.values());
+  rebuild();
 }
 
 // Normalised JSON of the fields that define a fixture, for change detection.

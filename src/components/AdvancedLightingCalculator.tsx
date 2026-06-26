@@ -26,27 +26,49 @@ import {
   Save,
   Share2,
   AlertTriangle,
+  Pencil,
+  Trash2,
+  PlusCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ROOM_TYPES } from '@/lib/roomTypes';
 import { calculateLighting } from '@/lib/calculator';
 import { buildCalculationInput } from '@/lib/roomConfig';
 import { track } from '@/lib/analytics';
-import { CalculationResult, FixtureSnapshot, LayerKey, RoomConfigValue, UnitSystem } from '@/types';
+import {
+  CalculationResult,
+  FixtureDef,
+  FixtureSnapshot,
+  LayerKey,
+  RoomConfigValue,
+  UnitSystem,
+} from '@/types';
 import { AdvancedState, SavedCalculation } from '@/types/saved-calculations';
 import { saveCalculation, generateCalculationId } from '@/lib/savedCalculations';
 import { buildShareUrl } from '@/lib/shareUrl';
-import { resolveFixture, resolveFixtureOrGhost, snapshotFixtures } from '@/lib/fixtureCatalog';
+import {
+  resolveFixture,
+  resolveFixtureOrGhost,
+  snapshotFixtures,
+  fixturePrice,
+} from '@/lib/fixtureCatalog';
+import { useFixtures } from '@/context/FixturesProvider';
+import { useCurrency } from '@/context/CurrencyProvider';
+import { CurrencyCode } from '@/config/markets';
 import { RoomInputs, SharedInputs } from './RoomInputs';
 import { LightingResults } from './LightingResults';
 import { PDFExport } from './PDFExport';
+import { FixtureFormDialog, FixtureDraft, FixtureScope } from './layered/FixtureFormDialog';
 import {
   fixturesForLayer,
+  allSelectableFixtures,
+  suggestedLayerForCategory,
   computeAdvancedTotals,
   suggestedLayerLumens,
   flagLumens,
   synthesizeLayeredResult,
   Flag,
+  FixtureOption,
   AdvancedTotals,
 } from '@/lib/layered/advanced';
 import { LAYER_INFO, KRUITHOF_NOTE, resolveLayerCct, layerCriNote, resolveColorQuality } from '@/lib/layered/guidance';
@@ -112,6 +134,89 @@ export default function AdvancedLightingCalculator({
   const [shareCopied, setShareCopied] = useState(false);
 
   const { selectedLayers, fixtureCounts } = advanced;
+  const { addPersonalFixture, registerDesignFixtures } = useFixtures();
+  const { currency, market } = useCurrency();
+
+  // Re-register this design's custom/derived fixtures so they resolve by id
+  // (cost, shopping, PDF, lumens) on first render and after a restore.
+  useEffect(() => {
+    if (advanced.customFixtures?.length) registerDesignFixtures(advanced.customFixtures);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [advanced.customFixtures]);
+
+  // Add or replace a custom/derived fixture in this design's inline list.
+  const upsertCustomFixture = (def: FixtureDef): FixtureDef[] => [
+    ...(advanced.customFixtures ?? []).filter((f) => f.id !== def.id),
+    def,
+  ];
+
+  // Drop an already-known fixture (any layer suggestion or a personal one) into a
+  // layer at quantity 1 if it is not already counted there.
+  const addExistingToLayer = (layer: LayerKey, key: string) => {
+    if ((fixtureCounts[layer]?.[key] ?? 0) === 0) setCount(layer, key, 1);
+  };
+
+  // Create a brand-new fixture and place it in a layer. `personal` also persists
+  // it to the reusable catalogue; both scopes carry it inline for portability.
+  const createFixture = (layer: LayerKey, draft: FixtureDraft, scope: FixtureScope) => {
+    const id = `custom-${uid()}`;
+    const def: FixtureDef = {
+      id,
+      name: draft.name,
+      category: draft.category,
+      typicalLumens: { min: draft.lumens, max: draft.lumens, recommended: draft.lumens },
+      price: { [currency]: draft.price },
+      wattage: draft.wattage,
+      source: scope === 'personal' ? 'user' : 'derived',
+      builtIn: false,
+    };
+    registerDesignFixtures([def]);
+    if (scope === 'personal') addPersonalFixture(def);
+    onAdvanced({
+      ...advanced,
+      customFixtures: upsertCustomFixture(def),
+      fixtureCounts: { ...fixtureCounts, [layer]: { ...(fixtureCounts[layer] || {}), [id]: 1 } },
+    });
+  };
+
+  // Override an existing fixture for this design: mint a new fixture seeded from
+  // the base with the edited lumens/price, then move the layer's count onto it.
+  const overrideFixture = (
+    layer: LayerKey,
+    baseId: string,
+    draft: FixtureDraft,
+    scope: FixtureScope
+  ) => {
+    const base = resolveFixtureOrGhost(baseId, snapshot);
+    const id = scope === 'personal' ? `custom-${uid()}` : `${baseId}__ovr-${uid(4)}`;
+    const def: FixtureDef = {
+      ...base,
+      id,
+      name: draft.name,
+      category: base.category,
+      typicalLumens: {
+        min: Math.min(base.typicalLumens.min || draft.lumens, draft.lumens),
+        max: Math.max(base.typicalLumens.max || draft.lumens, draft.lumens),
+        recommended: draft.lumens,
+      },
+      price: { ...base.price, [currency]: draft.price },
+      wattage: draft.wattage ?? base.wattage,
+      source: scope === 'personal' ? 'user' : 'derived',
+      builtIn: false,
+      archived: false,
+    };
+    registerDesignFixtures([def]);
+    if (scope === 'personal') addPersonalFixture(def);
+    const qty = fixtureCounts[layer]?.[baseId] ?? 0;
+    const layerMap = { ...(fixtureCounts[layer] || {}) };
+    delete layerMap[baseId];
+    layerMap[id] = (layerMap[id] ?? 0) + (qty > 0 ? qty : 1);
+    onAdvanced({
+      ...advanced,
+      customFixtures: upsertCustomFixture(def),
+      fixtureCounts: { ...fixtureCounts, [layer]: layerMap },
+    });
+  };
 
   const toggleLayer = (layer: LayerKey) => {
     const next = selectedLayers.includes(layer)
@@ -153,20 +258,29 @@ export default function AdvancedLightingCalculator({
 
     const base = calculateLighting(buildCalculationInput(shared));
     const required = base.totalLumensNeeded;
-    // Resolve fixtures via the live catalogue, falling back to the saved snapshot
-    // so a discontinued fixture still contributes its lumens on restore.
+    // This design's inline custom/derived fixtures, used to resolve and to keep
+    // them out of the "discontinued" list even before the registry is hydrated.
+    const customMap = new Map((advanced.customFixtures ?? []).map((f) => [f.id, f]));
+    // Resolve fixtures via the live catalogue, falling back to this design's
+    // custom fixtures, then the saved snapshot, so a fixture still contributes its
+    // lumens on restore.
     const resolve = (id: string) => {
       const f = resolveFixtureOrGhost(id, snapshot);
+      if (f.missing && customMap.has(id)) {
+        const c = customMap.get(id)!;
+        return { name: c.name, lumens: c.typicalLumens.recommended };
+      }
       return { name: f.name, lumens: f.typicalLumens.recommended };
     };
     const totals: AdvancedTotals = computeAdvancedTotals(selectedLayers, fixtureCounts, resolve);
     const suggested = suggestedLayerLumens(required, selectedLayers);
 
     // Fixtures referenced in the selection that no longer exist in the catalogue.
+    // Custom/derived fixtures carried on the design are never "discontinued".
     const missing: MissingFixture[] = [];
     for (const layer of selectedLayers) {
       for (const [id, qty] of Object.entries(fixtureCounts[layer] || {})) {
-        if (qty > 0 && !resolveFixture(id)) {
+        if (qty > 0 && !resolveFixture(id) && !customMap.has(id)) {
           missing.push({ layer, id, name: resolveFixtureOrGhost(id, snapshot).name, quantity: qty });
         }
       }
@@ -267,6 +381,17 @@ export default function AdvancedLightingCalculator({
       (s) => ids.includes(s.id) && !fresh.some((f) => f.id === s.id)
     );
     const fixtureSnapshot = [...fresh, ...carried];
+    // Carry only custom/derived fixtures the design still references inline, so a
+    // restore on any browser rebuilds them without dragging orphans along.
+    const referencedIds = new Set<string>();
+    for (const map of Object.values(advanced.fixtureCounts)) {
+      for (const [k, q] of Object.entries(map)) if (q > 0) referencedIds.add(k);
+    }
+    const customFixtures = (advanced.customFixtures ?? []).filter((f) => referencedIds.has(f.id));
+    const prunedAdvanced: AdvancedState = {
+      ...advanced,
+      customFixtures: customFixtures.length ? customFixtures : undefined,
+    };
     const roomName =
       config.roomType === 'other' && config.customRoomName
         ? config.customRoomName
@@ -280,7 +405,7 @@ export default function AdvancedLightingCalculator({
       mode: 'advanced',
       input: buildCalculationInput(shared),
       result,
-      advanced,
+      advanced: prunedAdvanced,
       fixtureSnapshot,
     };
     saveCalculation(saved);
@@ -387,7 +512,14 @@ export default function AdvancedLightingCalculator({
                 counts={fixtureCounts[layer] || {}}
                 suggested={liveSuggested[layer]}
                 cct={resolveLayerCct(config.roomType, layer)}
+                currency={currency}
+                currencySymbol={market.symbol}
+                snapshot={snapshot}
                 onCount={(key, qty) => setCount(layer, key, qty)}
+                onAddExisting={(key) => addExistingToLayer(layer, key)}
+                onCreate={(draft, scope) => createFixture(layer, draft, scope)}
+                onEdit={(baseId, draft, scope) => overrideFixture(layer, baseId, draft, scope)}
+                onRemove={(key) => setCount(layer, key, 0)}
               />
             ))}
 
@@ -484,18 +616,68 @@ function LayerFixturePicker({
   counts,
   suggested,
   cct,
+  currency,
+  currencySymbol,
+  snapshot,
   onCount,
+  onAddExisting,
+  onCreate,
+  onEdit,
+  onRemove,
 }: {
   layer: LayerKey;
   counts: Record<string, number>;
   suggested: number;
   cct: number;
+  currency: CurrencyCode;
+  currencySymbol: string;
+  snapshot?: FixtureSnapshot[];
   onCount: (key: string, qty: number) => void;
+  onAddExisting: (key: string) => void;
+  onCreate: (draft: FixtureDraft, scope: FixtureScope) => void;
+  onEdit: (baseId: string, draft: FixtureDraft, scope: FixtureScope) => void;
+  onRemove: (key: string) => void;
 }) {
   const info = LAYER_INFO[layer];
   const Icon = LAYER_ICON[layer];
-  const fixtures = fixturesForLayer(layer);
-  const subtotal = fixtures.reduce((s, f) => s + (counts[f.key] || 0) * f.lumens, 0);
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editKey, setEditKey] = useState<string | null>(null);
+
+  // Rows = the layer's suggested fixtures, plus any other fixture already counted
+  // here (added from another category, custom, or a derived override).
+  const suggestedRows = fixturesForLayer(layer);
+  const suggestedKeys = new Set(suggestedRows.map((r) => r.key));
+  const extraRows: FixtureOption[] = Object.keys(counts)
+    .filter((k) => (counts[k] || 0) > 0 && !suggestedKeys.has(k))
+    .map((k) => {
+      const f = resolveFixtureOrGhost(k, snapshot);
+      return { key: k, name: f.name, lumens: f.typicalLumens.recommended, category: f.category };
+    });
+  const rows = [...suggestedRows, ...extraRows];
+  const extraKeySet = new Set(extraRows.map((r) => r.key));
+  const subtotal = rows.reduce((s, r) => s + (counts[r.key] || 0) * r.lumens, 0);
+
+  // "Add any fixture" menu: every selectable fixture not already a row.
+  const shownKeys = new Set(rows.map((r) => r.key));
+  const addOptions = allSelectableFixtures().filter((f) => !shownKeys.has(f.key));
+
+  // Prefill for the edit dialog.
+  const editFixture = editKey ? resolveFixtureOrGhost(editKey, snapshot) : undefined;
+  const editInitial: Partial<FixtureDraft> | undefined = editFixture
+    ? {
+        name: editFixture.name,
+        category: editFixture.category,
+        lumens: editFixture.typicalLumens.recommended,
+        price: fixturePrice(editFixture, currency),
+        wattage: editFixture.wattage,
+      }
+    : undefined;
+
+  const handleAddSelect = (value: string) => {
+    if (value === '__create__') setCreateOpen(true);
+    else onAddExisting(value);
+  };
 
   return (
     <div className="rounded-lg border border-border p-4 space-y-3">
@@ -515,15 +697,42 @@ function LayerFixturePicker({
       </div>
 
       <div className="space-y-2">
-        {fixtures.map((f) => {
+        {rows.map((f) => {
           const qty = counts[f.key] || 0;
+          const isExtra = extraKeySet.has(f.key);
           return (
-            <div key={f.key} className="flex items-center justify-between gap-3">
-              <span className="text-sm">
-                {f.name}{' '}
-                <span className="text-xs text-muted-foreground">({f.lumens.toLocaleString()} lm)</span>
+            <div key={f.key} className="flex items-center justify-between gap-2">
+              <span className="flex min-w-0 items-baseline gap-1 text-sm">
+                <span className="truncate">{f.name}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  ({f.lumens.toLocaleString()} lm)
+                </span>
               </span>
               <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-muted-foreground"
+                  onClick={() => setEditKey(f.key)}
+                  aria-label={`Edit ${f.name}`}
+                  title="Override lumens or price"
+                >
+                  <Pencil className="h-3 w-3" />
+                </Button>
+                {isExtra && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground"
+                    onClick={() => onRemove(f.key)}
+                    aria-label={`Remove ${f.name}`}
+                    title="Remove from this layer"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                )}
                 <Button
                   type="button"
                   variant="outline"
@@ -558,14 +767,71 @@ function LayerFixturePicker({
         })}
       </div>
 
+      {/* Add any fixture, or create a new one on the fly. */}
+      <Select value="" onValueChange={handleAddSelect}>
+        <SelectTrigger className="h-8">
+          <small className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <PlusCircle className="h-3.5 w-3.5" />
+            <span>Add a fixture to this layer</span>
+          </small>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__create__">+ Create new fixture…</SelectItem>
+          {addOptions.map((f) => {
+            const sl = suggestedLayerForCategory(f.category);
+            const hint = sl && sl !== layer ? ` · ${LAYER_INFO[sl].laymanLabel}` : '';
+            return (
+              <SelectItem key={f.key} value={f.key}>
+                {f.name} ({f.lumens.toLocaleString()} lm){hint}
+              </SelectItem>
+            );
+          })}
+        </SelectContent>
+      </Select>
+
       <div className="flex justify-between border-t pt-2 text-sm">
         <span className="text-muted-foreground">
           Selected {subtotal.toLocaleString()} lm
           {suggested > 0 && ` · suggested ≈ ${suggested.toLocaleString()} lm`}
         </span>
       </div>
+
+      <FixtureFormDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        title={`Add a fixture to ${info.laymanLabel}`}
+        description="Define a fixture that isn't in the list. It joins this layer right away."
+        currencySymbol={currencySymbol}
+        submitLabels={{ design: 'Use in this design', personal: 'Save to my fixtures' }}
+        onSubmit={onCreate}
+      />
+
+      <FixtureFormDialog
+        open={editKey !== null}
+        onOpenChange={(o) => {
+          if (!o) setEditKey(null);
+        }}
+        title={editFixture ? `Edit ${editFixture.name}` : 'Edit fixture'}
+        description="Adjust the lumens or price for this design. The original fixture stays unchanged."
+        initial={editInitial}
+        lockCategory
+        currencySymbol={currencySymbol}
+        submitLabels={{ design: 'Use in this design', personal: 'Save to my fixtures' }}
+        onSubmit={(draft, scope) => {
+          if (editKey) onEdit(editKey, draft, scope);
+          setEditKey(null);
+        }}
+      />
     </div>
   );
+}
+
+// Short id for custom/derived fixtures (browser crypto, with a Math.random fallback).
+function uid(n = 8): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID().replace(/-/g, '').slice(0, n);
+  }
+  return Math.random().toString(36).slice(2, 2 + n);
 }
 
 function LayeredSummary({ view }: { view: AdvancedView }) {

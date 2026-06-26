@@ -1,4 +1,4 @@
-import { CalculationInput, CalculationResult, FixtureSnapshot, LayerKey } from './index';
+import { CalculationInput, CalculationResult, FixtureDef, FixtureSnapshot, LayerKey } from './index';
 import type { DesignerState } from '@/lib/shareUrl';
 
 // Advanced (layered) selection: which layers are on, and the quantity of each
@@ -6,6 +6,11 @@ import type { DesignerState } from '@/lib/shareUrl';
 export type AdvancedState = {
   selectedLayers: LayerKey[];
   fixtureCounts: Record<LayerKey, Record<string, number>>;
+  // Custom and derived (override) fixtures this design references, carried inline
+  // so the design restores on any browser even without the personal catalogue.
+  // Derived overrides (source: 'derived') only ever live here, never in the
+  // personal catalogue; user fixtures are copied here too for portability.
+  customFixtures?: FixtureDef[];
 };
 
 export type SavedCalculation = {

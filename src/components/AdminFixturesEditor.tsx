@@ -18,7 +18,18 @@ import { CurrencyCode, MARKETS } from '@/config/markets';
 import { validateFixtures, fixtureOverrides, fixtureWarnings } from '@/lib/fixtureCatalog';
 import { getFixtureUsage } from '@/lib/fixtureUsage';
 
-const CATEGORIES: FixtureCategory[] = ['recessed', 'pendant', 'track', 'linear', 'sconce', 'strip'];
+const CATEGORIES: FixtureCategory[] = [
+  'recessed',
+  'flush',
+  'pendant',
+  'track',
+  'linear',
+  'undercabinet',
+  'sconce',
+  'vanity',
+  'lamp',
+  'strip',
+];
 const CURRENCIES = Object.keys(MARKETS) as CurrencyCode[];
 
 function newFixture(): FixtureDef {
