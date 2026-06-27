@@ -108,6 +108,12 @@ export default function RootLayout({
                       Designer
                     </Link>
                     <Link
+                      href="/landscape"
+                      className="hidden sm:inline text-sm font-medium text-muted-foreground hover:text-brand-bronze transition-colors"
+                    >
+                      Landscape
+                    </Link>
+                    <Link
                       href="/project"
                       className="hidden sm:inline text-sm font-medium text-muted-foreground hover:text-brand-bronze transition-colors"
                     >

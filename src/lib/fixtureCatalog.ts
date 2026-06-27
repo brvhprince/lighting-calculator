@@ -1,4 +1,4 @@
-import { FixtureCategory, FixtureDef, FixtureSnapshot } from '@/types';
+import { FixtureCategory, FixtureDef, FixtureSnapshot, FixturePrice } from '@/types';
 import { CurrencyCode, MARKETS } from '@/config/markets';
 import { BUILTIN_FIXTURES } from './fixtureTypes';
 
@@ -249,9 +249,16 @@ export function snapshotFixtures(ids: string[]): FixtureSnapshot[] {
   return out;
 }
 
-// Unit price for a fixture in a currency, with sensible fallbacks: the requested
-// currency → USD → first defined price → 0.
-export function fixturePrice(fixture: FixtureDef, currency: CurrencyCode): number {
+// Any item carrying per-currency pricing (catalogue fixtures, landscape fixtures,
+// hardware). The pricing helpers only read these two fields.
+export type Priceable = {
+  price: FixturePrice;
+  priceRange?: Partial<Record<CurrencyCode, [number, number]>>;
+};
+
+// Unit price for a priced item in a currency, with sensible fallbacks: the
+// requested currency → USD → first defined price → 0.
+export function fixturePrice(fixture: Priceable, currency: CurrencyCode): number {
   const p = fixture.price ?? {};
   if (typeof p[currency] === 'number') return p[currency] as number;
   if (typeof p.USD === 'number') return p.USD as number;
@@ -259,9 +266,9 @@ export function fixturePrice(fixture: FixtureDef, currency: CurrencyCode): numbe
   return typeof first === 'number' ? first : 0;
 }
 
-// Shopping "from–to" range for a fixture in a currency. Uses an explicit
+// Shopping "from-to" range for a priced item in a currency. Uses an explicit
 // priceRange when set, otherwise derives ±30%/+50% around the unit price.
-export function fixturePriceRange(fixture: FixtureDef, currency: CurrencyCode): [number, number] {
+export function fixturePriceRange(fixture: Priceable, currency: CurrencyCode): [number, number] {
   const explicit = fixture.priceRange?.[currency];
   if (explicit) return explicit;
   const unit = fixturePrice(fixture, currency);
