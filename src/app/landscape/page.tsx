@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import LandscapeEstimator from '@/components/LandscapeEstimator';
+import LandscapeShell from '@/components/LandscapeShell';
 
 export const metadata: Metadata = {
   title: 'Landscape Lighting Estimator | Penlabs Lighting Calculator',
@@ -17,7 +17,7 @@ export default function LandscapePage() {
           low-voltage, solar or mains outdoor scheme.
         </p>
       </div>
-      <LandscapeEstimator />
+      <LandscapeShell />
     </div>
   );
 }

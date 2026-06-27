@@ -73,7 +73,8 @@ function sizeTransformer(loadWatts: number, currency: CurrencyCode) {
 
 export function computeLandscape(
   input: LandscapeInput,
-  market: Market
+  market: Market,
+  opts?: { cableMetersOverride?: number }
 ): LandscapeResult {
   const currency = market.code;
   const { system } = input;
@@ -123,7 +124,11 @@ export function computeLandscape(
     transformer = sizeTransformer(totalWatts, currency);
     materialLow += transformer.price;
     materialHigh += transformer.price;
-    cableMeters = Math.round(totalFixtures * CABLE_M_PER_FIXTURE);
+    // Measured run from the site plan when available, else a per-fixture estimate.
+    cableMeters =
+      opts?.cableMetersOverride != null
+        ? Math.round(opts.cableMetersOverride)
+        : Math.round(totalFixtures * CABLE_M_PER_FIXTURE);
     const perM = CABLE_PRICE_PER_M[currency] ?? CABLE_PRICE_PER_M.USD ?? 0;
     cablePrice = Math.round(cableMeters * perM);
     materialLow += cablePrice;

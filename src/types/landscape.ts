@@ -37,6 +37,8 @@ export type LandscapeFixture = {
   beam?: string; // e.g. "24°" or "120°"
   price: FixturePrice;
   priceRange?: Partial<Record<CurrencyCode, [number, number]>>;
+  archived?: boolean; // hidden from selection, still resolvable
+  builtIn?: boolean; // seeded in code (guards permanent delete)
 };
 
 // How a feature is measured by the user.

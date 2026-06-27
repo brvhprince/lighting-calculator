@@ -11,6 +11,14 @@ import {
   setPersonalFixtures,
   registerFixtures,
 } from '@/lib/fixtureCatalog';
+import { LandscapeFixture } from '@/types/landscape';
+import {
+  LandscapeFixtureStore,
+  BUILTIN_LANDSCAPE_FIXTURES,
+  getLandscapeFixtures,
+  setLandscapeFixtures,
+  resetLandscapeFixtures,
+} from '@/lib/landscape/fixtures';
 
 type FixturesContextType = {
   // Effective catalogue (built-ins merged with admin overrides), including archived.
@@ -28,12 +36,18 @@ type FixturesContextType = {
   // Register transient design fixtures (custom + derived overrides) so they
   // resolve by id everywhere (cost, shopping, PDF) while a design is open.
   registerDesignFixtures: (items: FixtureDef[]) => void;
+  // Landscape (outdoor) catalogue, admin-editable like the indoor one.
+  landscapeCatalog: LandscapeFixture[];
+  landscapeOverrideItems: LandscapeFixture[] | undefined;
+  setLandscapeOverrideItems: (items: LandscapeFixture[]) => void;
+  resetLandscapeOverrides: () => void;
 };
 
 const FixturesContext = createContext<FixturesContextType | undefined>(undefined);
 
 const CACHE_KEY = 'pen-lighting-fixtures';
 const MY_FIXTURES_KEY = 'pen-lighting-my-fixtures';
+const LANDSCAPE_CACHE_KEY = 'pen-landscape-fixtures';
 
 // Hydrate the module registry and return the effective catalogue snapshot.
 function hydrate(items: FixtureDef[] | undefined): FixtureDef[] {
@@ -42,10 +56,18 @@ function hydrate(items: FixtureDef[] | undefined): FixtureDef[] {
   return getFixtureCatalog();
 }
 
+function hydrateLandscape(items: LandscapeFixture[] | undefined): LandscapeFixture[] {
+  if (items && items.length) setLandscapeFixtures(items);
+  else resetLandscapeFixtures();
+  return getLandscapeFixtures();
+}
+
 export function FixturesProvider({ children }: { children: React.ReactNode }) {
   const [catalog, setCatalog] = useState<FixtureDef[]>(BUILTIN_FIXTURES);
   const [overrideItems, setOverrideItemsState] = useState<FixtureDef[] | undefined>(undefined);
   const [personalFixtures, setPersonalFixturesState] = useState<FixtureDef[]>([]);
+  const [landscapeCatalog, setLandscapeCatalog] = useState<LandscapeFixture[]>(BUILTIN_LANDSCAPE_FIXTURES);
+  const [landscapeOverrideItems, setLandscapeOverrideItemsState] = useState<LandscapeFixture[] | undefined>(undefined);
 
   useEffect(() => {
     // 0) Load the personal catalogue first so every rebuild below includes it.
@@ -95,6 +117,60 @@ export function FixturesProvider({ children }: { children: React.ReactNode }) {
       .catch(() => {
         /* offline / no DB, keep cached/default values */
       });
+  }, []);
+
+  // Hydrate the landscape catalogue from cache then the server, like the indoor one.
+  useEffect(() => {
+    const cached = localStorage.getItem(LANDSCAPE_CACHE_KEY);
+    if (cached) {
+      try {
+        const items = JSON.parse(cached) as LandscapeFixture[];
+        if (Array.isArray(items) && items.length) {
+          setLandscapeOverrideItemsState(items);
+          setLandscapeCatalog(hydrateLandscape(items));
+        }
+      } catch {
+        /* ignore corrupt cache */
+      }
+    }
+    fetch('/api/admin/landscape-fixtures')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        const store = data?.fixtures as LandscapeFixtureStore | undefined;
+        const items =
+          store && Array.isArray(store.items) && store.items.length ? store.items : undefined;
+        setLandscapeOverrideItemsState(items);
+        setLandscapeCatalog(hydrateLandscape(items));
+        try {
+          if (items) localStorage.setItem(LANDSCAPE_CACHE_KEY, JSON.stringify(items));
+          else localStorage.removeItem(LANDSCAPE_CACHE_KEY);
+        } catch {
+          /* ignore */
+        }
+      })
+      .catch(() => {
+        /* offline / no DB, keep defaults */
+      });
+  }, []);
+
+  const setLandscapeOverrideItems = useCallback((items: LandscapeFixture[]) => {
+    setLandscapeOverrideItemsState(items);
+    setLandscapeCatalog(hydrateLandscape(items));
+    try {
+      localStorage.setItem(LANDSCAPE_CACHE_KEY, JSON.stringify(items));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const resetLandscapeOverrides = useCallback(() => {
+    setLandscapeOverrideItemsState(undefined);
+    setLandscapeCatalog(hydrateLandscape(undefined));
+    try {
+      localStorage.removeItem(LANDSCAPE_CACHE_KEY);
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   const setOverrideItems = useCallback((items: FixtureDef[]) => {
@@ -165,6 +241,10 @@ export function FixturesProvider({ children }: { children: React.ReactNode }) {
         updatePersonalFixture,
         removePersonalFixture,
         registerDesignFixtures,
+        landscapeCatalog,
+        landscapeOverrideItems,
+        setLandscapeOverrideItems,
+        resetLandscapeOverrides,
       }}
     >
       {children}

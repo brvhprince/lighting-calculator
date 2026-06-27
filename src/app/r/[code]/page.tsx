@@ -110,7 +110,7 @@ export default async function SharedReportPage({ params }: { params: Promise<{ c
       </Card>
 
       <p className="text-center text-xs text-muted-foreground">
-        Penlabs Lighting · a Pen Homes company. Intentional, invisible technology.
+        Penlabs Lighting · a Pen Homes company · Intentional, invisible technology.
       </p>
     </div>
   );
