@@ -2,6 +2,9 @@ import { FixtureItem } from './index';
 
 export type ProjectRoom = {
   id: string;
+  // The saved-calculation id this room came from, so the picker can hide rooms
+  // already added. Absent on legacy rooms saved before this was tracked.
+  sourceId?: string;
   name: string;
   areaDisplay: number; // area in the room's own unit
   areaUnit: string; // "ft²" | "m²"

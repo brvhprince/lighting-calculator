@@ -81,6 +81,7 @@ export function roomFromCalculation(
   const range = roomCostRange(result.fixtureItems, fixtures, currency, market);
   return {
     id: genId('room'),
+    sourceId: calc.id,
     name: calc.description?.trim() || calc.name,
     areaDisplay: Number(result.area.toFixed(1)),
     areaUnit: result.areaUnit,

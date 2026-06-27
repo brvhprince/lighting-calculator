@@ -5,13 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 import {
   getProjects,
   createProject,
@@ -45,6 +39,7 @@ import {
   X,
   FileDown,
   Loader2,
+  Search,
 } from 'lucide-react';
 
 export default function ProjectManager() {
@@ -53,7 +48,8 @@ export default function ProjectManager() {
   const [saved, setSaved] = useState<SavedCalculation[]>([]);
   const [newName, setNewName] = useState('');
   const [newClient, setNewClient] = useState('');
-  const [roomToAdd, setRoomToAdd] = useState<string>('');
+  const [roomSearch, setRoomSearch] = useState('');
+  const [selectedToAdd, setSelectedToAdd] = useState<Set<string>>(new Set());
   const [publishing, setPublishing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
@@ -97,16 +93,38 @@ export default function ProjectManager() {
     setActiveId(p.id);
   };
 
-  const handleAddRoom = () => {
-    if (!active || !roomToAdd) return;
-    const calc = saved.find((c) => c.id === roomToAdd);
-    if (!calc) return;
-    const room = roomFromCalculation(calc, market.code, market);
-    if (room) {
-      addRoomToProject(active.id, room);
-      setRoomToAdd('');
-      refresh();
+  // Saved rooms not already in the active project (matched by source id).
+  const availableSaved = useMemo(() => {
+    const added = new Set((active?.rooms ?? []).map((r) => r.sourceId).filter(Boolean) as string[]);
+    return saved.filter((c) => !added.has(c.id));
+  }, [saved, active]);
+
+  // Apply the search filter for the picker.
+  const filteredSaved = useMemo(() => {
+    const q = roomSearch.trim().toLowerCase();
+    if (!q) return availableSaved;
+    return availableSaved.filter((c) => (c.description?.trim() || c.name).toLowerCase().includes(q));
+  }, [availableSaved, roomSearch]);
+
+  const toggleSelect = (id: string) =>
+    setSelectedToAdd((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const handleAddRooms = () => {
+    if (!active || selectedToAdd.size === 0) return;
+    for (const id of selectedToAdd) {
+      const calc = saved.find((c) => c.id === id);
+      if (!calc) continue;
+      const room = roomFromCalculation(calc, market.code, market);
+      if (room) addRoomToProject(active.id, room);
     }
+    setSelectedToAdd(new Set());
+    setRoomSearch('');
+    refresh();
   };
 
   const handleDeleteProject = (id: string) => {
@@ -386,32 +404,67 @@ export default function ProjectManager() {
                   </div>
                 )}
 
-                {/* Add room */}
-                <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-muted/30 p-4 print:hidden">
-                  <div className="min-w-[220px] flex-1 space-y-1.5">
-                    <Label>Add a saved room</Label>
-                    {saved.length ? (
-                      <Select value={roomToAdd} onValueChange={setRoomToAdd}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Choose a saved calculation" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {saved.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>
-                              {c.description?.trim() || c.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        No saved rooms yet, save a calculation from the Full Calculator first.
-                      </p>
+                {/* Add rooms: searchable multi-select of saved rooms not yet added */}
+                <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4 print:hidden">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label>Add saved rooms</Label>
+                    {selectedToAdd.size > 0 && (
+                      <span className="text-xs text-muted-foreground">{selectedToAdd.size} selected</span>
                     )}
                   </div>
-                  <Button onClick={handleAddRoom} disabled={!roomToAdd} className="gap-2">
-                    <Plus className="h-4 w-4" /> Add room
-                  </Button>
+                  {availableSaved.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      {saved.length === 0
+                        ? 'No saved rooms yet, save a calculation from the calculator first.'
+                        : 'All your saved rooms are already in this project.'}
+                    </p>
+                  ) : (
+                    <>
+                      <div className="relative">
+                        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          value={roomSearch}
+                          onChange={(e) => setRoomSearch(e.target.value)}
+                          placeholder="Search saved rooms…"
+                          className="pl-8"
+                        />
+                      </div>
+                      <div className="max-h-56 divide-y divide-border/60 overflow-y-auto rounded-md border border-border/60">
+                        {filteredSaved.length === 0 ? (
+                          <p className="p-3 text-sm text-muted-foreground">No rooms match that search.</p>
+                        ) : (
+                          filteredSaved.map((c) => {
+                            const checked = selectedToAdd.has(c.id);
+                            return (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onClick={() => toggleSelect(c.id)}
+                                aria-pressed={checked}
+                                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors hover:bg-muted/60"
+                              >
+                                <span
+                                  className={cn(
+                                    'flex h-4 w-4 shrink-0 items-center justify-center rounded border',
+                                    checked ? 'border-brand-bronze bg-brand-bronze text-white' : 'border-border'
+                                  )}
+                                >
+                                  {checked && <Check className="h-3 w-3" />}
+                                </span>
+                                <span className="flex-1 truncate">{c.description?.trim() || c.name}</span>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                      <div className="flex justify-end">
+                        <Button onClick={handleAddRooms} disabled={selectedToAdd.size === 0} className="gap-2">
+                          <Plus className="h-4 w-4" />
+                          Add {selectedToAdd.size > 0 ? selectedToAdd.size : ''} room{selectedToAdd.size === 1 ? '' : 's'}
+                        </Button>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Rollup */}
