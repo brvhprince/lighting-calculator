@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import LumensOnlyCalculator from '@/components/LumensOnlyCalculator';
 
 export const metadata: Metadata = {
-  title: 'Lumens Calculator, Penlabs',
+  title: 'Lumens Calculator |  Lighting Calculator',
   description: 'A fast, room-aware estimate of the total lumens you need, in imperial or metric.',
 };
 

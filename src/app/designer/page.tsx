@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import RoomDesigner from '@/components/RoomDesigner';
 
 export const metadata: Metadata = {
-  title: 'Room Designer, Penlabs Lighting Calculator',
+  title: 'Room Designer | Penlabs Lighting Calculator',
   description:
     'Draw rectangular, L-shaped, T-shaped or freeform rooms to scale and auto-place fixtures with a live light-coverage heatmap.',
 };

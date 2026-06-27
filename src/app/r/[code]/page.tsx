@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Project Report, Penlabs',
+  title: 'Project | Report Lighting Calculator',
   robots: { index: false, follow: false },
 };
 
