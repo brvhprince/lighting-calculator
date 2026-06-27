@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Map, Cable, Sun, Zap, Trash2, Undo2, Check, Plug } from 'lucide-react';
+import { Map, Cable, Sun, Zap, Trash2, Undo2, Check, Plug, Hand, Maximize2, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Point } from '@/lib/geometry';
 import { useCurrency } from '@/context/CurrencyProvider';
@@ -23,11 +23,17 @@ import { TECHNIQUES, TECHNIQUE_ORDER } from '@/lib/landscape/techniques';
 import { computeLandscape, ftToUnit, unitToFt } from '@/lib/landscape/engine';
 import {
   PlacedFeature,
+  Anchor,
+  CableGauge,
+  CABLE_GAUGES,
+  VoltageDropResult,
   drawKind,
   placedToFeatures,
   polylineLengthFt,
-  anchorsForFeature,
-  cableRunMeters,
+  planAnchors,
+  cableChain,
+  cableMetersFromChain,
+  voltageDrop,
 } from '@/lib/landscape/siteplan';
 import { polygonArea } from '@/lib/geometry';
 import { loadLogoDataUrl } from '@/lib/pdf/brand';
@@ -63,22 +69,33 @@ export default function LandscapeDesigner() {
   const [cursor, setCursor] = useState<Point | null>(null);
   const [placingTransformer, setPlacingTransformer] = useState(false);
   const [transformer, setTransformer] = useState<Point | null>(null);
+  const [gauge, setGauge] = useState<CableGauge>(12);
+  const [panTool, setPanTool] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
 
   const metric = unit === 'metric';
   const lenUnit = metric ? 'm' : 'ft';
   const kind = drawKind(technique);
 
-  // Fit the plot rectangle into the canvas (no pan/zoom for v1).
-  const view = useMemo(() => {
+  // View transform (pan/zoom). Refits when the plot size changes; the user can
+  // wheel-zoom, drag-pan (Pan tool), or press Fit.
+  const [view, setView] = useState({ scale: 1, ox: 0, oy: 0 });
+  const panning = useRef<{ x: number; y: number } | null>(null);
+
+  const fitView = useCallback(() => {
     const pad = 48;
     const scale = Math.min((CANVAS_W - pad * 2) / siteWidthFt, (CANVAS_H - pad * 2) / siteDepthFt);
-    return {
+    setView({
       scale,
       ox: (CANVAS_W - siteWidthFt * scale) / 2,
       oy: (CANVAS_H - siteDepthFt * scale) / 2,
-    };
+    });
   }, [siteWidthFt, siteDepthFt]);
+
+  // Refit on mount and whenever the plot dimensions change.
+  useEffect(() => {
+    fitView();
+  }, [fitView]);
 
   const toScreen = useCallback((p: Point) => ({ x: view.ox + p.x * view.scale, y: view.oy + p.y * view.scale }), [view]);
   const toFeet = useCallback(
@@ -92,21 +109,21 @@ export default function LandscapeDesigner() {
     [view, siteWidthFt, siteDepthFt]
   );
 
-  // ---- Engine result (with measured cable when a transformer is placed) ----
-  const result = useMemo(() => {
+  // ---- Engine result + measured cable + voltage drop ----
+  const { result, chain, vd } = useMemo(() => {
     const features = placedToFeatures(placed);
     const base = computeLandscape({ system, features }, market);
-    if (system !== 'lowvoltage' || !transformer) return base;
-    const anchors: Point[] = [];
-    for (const line of base.lines) {
-      const pf = placed.find((p) => p.id === line.featureId);
-      if (pf) anchors.push(...anchorsForFeature(pf, line.quantity));
+    if (system !== 'lowvoltage' || !transformer) {
+      return { result: base, chain: [] as Anchor[], vd: null as VoltageDropResult | null };
     }
-    const cableM = cableRunMeters(transformer, anchors);
-    return computeLandscape({ system, features }, market, { cableMetersOverride: cableM });
+    const anchors = planAnchors(placed, base);
+    const ch = cableChain(transformer, anchors);
+    const cableM = cableMetersFromChain(ch);
+    const withCable = computeLandscape({ system, features }, market, { cableMetersOverride: cableM });
+    return { result: withCable, chain: ch, vd: voltageDrop(ch, gauge) };
     // landscapeCatalog triggers a recompute after admin edits hydrate.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [placed, system, transformer, market, landscapeCatalog]);
+  }, [placed, system, transformer, gauge, market, landscapeCatalog]);
 
   // ---- Canvas drawing ----
   const draw = useCallback(() => {
@@ -154,37 +171,19 @@ export default function LandscapeDesigner() {
     ctx.lineWidth = 1.5;
     ctx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
 
-    // Cable chain (behind features)
-    if (system === 'lowvoltage' && transformer) {
-      const anchors: Point[] = [];
-      for (const line of result.lines) {
-        const pf = placed.find((p) => p.id === line.featureId);
-        if (pf) anchors.push(...anchorsForFeature(pf, line.quantity));
-      }
-      // mirror the greedy chain order used for the length estimate
-      const remaining = anchors.slice();
-      let cur = transformer;
-      ctx.strokeStyle = 'rgba(166,137,102,0.5)';
+    // Cable chain (behind features), in the computed visiting order.
+    if (chain.length > 1) {
+      ctx.strokeStyle = 'rgba(166,137,102,0.55)';
       ctx.setLineDash([4, 3]);
       ctx.lineWidth = 1;
-      while (remaining.length) {
-        let bi = 0;
-        let bd = Infinity;
-        for (let i = 0; i < remaining.length; i++) {
-          const d = Math.hypot(remaining[i].x - cur.x, remaining[i].y - cur.y);
-          if (d < bd) {
-            bd = d;
-            bi = i;
-          }
-        }
-        const a = toScreen(cur);
-        const b = toScreen(remaining[bi]);
-        ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
-        ctx.stroke();
-        cur = remaining.splice(bi, 1)[0];
+      ctx.beginPath();
+      const start = toScreen(chain[0]);
+      ctx.moveTo(start.x, start.y);
+      for (let i = 1; i < chain.length; i++) {
+        const sc = toScreen(chain[i]);
+        ctx.lineTo(sc.x, sc.y);
       }
+      ctx.stroke();
       ctx.setLineDash([]);
     }
 
@@ -256,11 +255,33 @@ export default function LandscapeDesigner() {
       ctx.fillRect(s.x - 7, s.y - 7, 14, 14);
       ctx.strokeRect(s.x - 7, s.y - 7, 14, 14);
     }
-  }, [placed, draft, cursor, transformer, system, result, view, toScreen, siteWidthFt, siteDepthFt]);
+  }, [placed, draft, cursor, transformer, chain, view, toScreen, siteWidthFt, siteDepthFt]);
 
   useEffect(() => {
     draw();
   }, [draw]);
+
+  // Wheel zoom toward the cursor (native non-passive listener so we can prevent
+  // the page from scrolling).
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const sx = ((e.clientX - rect.left) * CANVAS_W) / rect.width;
+      const sy = ((e.clientY - rect.top) * CANVAS_H) / rect.height;
+      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+      setView((v) => {
+        const scale = Math.max(2, Math.min(240, v.scale * factor));
+        const wx = (sx - v.ox) / v.scale;
+        const wy = (sy - v.oy) / v.scale;
+        return { scale, ox: sx - wx * scale, oy: sy - wy * scale };
+      });
+    };
+    canvas.addEventListener('wheel', onWheel, { passive: false });
+    return () => canvas.removeEventListener('wheel', onWheel);
+  }, []);
 
   // ---- Pointer interaction ----
   const local = (e: React.PointerEvent | React.MouseEvent) => {
@@ -271,7 +292,26 @@ export default function LandscapeDesigner() {
     };
   };
 
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (!panTool) return;
+    panning.current = { x: e.clientX, y: e.clientY };
+    canvasRef.current?.setPointerCapture(e.pointerId);
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!panTool || !panning.current) return;
+    const rect = canvasRef.current!.getBoundingClientRect();
+    const dx = ((e.clientX - panning.current.x) * CANVAS_W) / rect.width;
+    const dy = ((e.clientY - panning.current.y) * CANVAS_H) / rect.height;
+    panning.current = { x: e.clientX, y: e.clientY };
+    setView((v) => ({ ...v, ox: v.ox + dx, oy: v.oy + dy }));
+  };
+  const onPointerUp = (e: React.PointerEvent) => {
+    panning.current = null;
+    canvasRef.current?.releasePointerCapture(e.pointerId);
+  };
+
   const onClick = (e: React.MouseEvent) => {
+    if (panTool) return;
     const { sx, sy } = local(e);
     const pt = toFeet(sx, sy);
     if (placingTransformer) {
@@ -326,7 +366,14 @@ export default function LandscapeDesigner() {
     try {
       const logoSrc = await loadLogoDataUrl();
       const { buildLandscapeReportBlob } = await import('@/lib/pdf/landscapeReport');
-      const blob = await buildLandscapeReportBlob(gatherLandscapeReportData({ result, market, logoSrc }));
+      const blob = await buildLandscapeReportBlob(
+        gatherLandscapeReportData({
+          result,
+          market,
+          logoSrc,
+          plan: { widthFt: siteWidthFt, depthFt: siteDepthFt, placed, transformer, gauge },
+        })
+      );
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -401,19 +448,6 @@ export default function LandscapeDesigner() {
               </div>
             </div>
 
-            <div className="rounded-lg border border-border bg-muted/20" style={{ aspectRatio: `${CANVAS_W} / ${CANVAS_H}` }}>
-              <canvas
-                ref={canvasRef}
-                role="img"
-                aria-label="Landscape site plan canvas"
-                className="h-full w-full rounded-lg"
-                style={{ cursor: placingTransformer ? 'cell' : 'crosshair' }}
-                onClick={onClick}
-                onMouseMove={onMove}
-                onDoubleClick={finishDraft}
-              />
-            </div>
-
             <div className="flex flex-wrap gap-2">
               {kind !== 'point' && (
                 <>
@@ -429,12 +463,24 @@ export default function LandscapeDesigner() {
                 <Button
                   variant={placingTransformer ? 'default' : 'outline'}
                   size="sm"
-                  onClick={() => setPlacingTransformer((v) => !v)}
+                  onClick={() => { setPlacingTransformer((v) => !v); setPanTool(false); }}
                   className="gap-1.5"
                 >
                   <Plug className="h-4 w-4" /> {transformer ? 'Move transformer' : 'Place transformer'}
                 </Button>
               )}
+              <Button
+                variant={panTool ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => { setPanTool((v) => !v); setPlacingTransformer(false); }}
+                className="gap-1.5"
+                title="Drag to pan; scroll to zoom"
+              >
+                <Hand className="h-4 w-4" /> Pan
+              </Button>
+              <Button variant="outline" size="sm" onClick={fitView} className="gap-1.5" title="Fit the plot to the canvas">
+                <Maximize2 className="h-4 w-4" /> Fit
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -443,6 +489,22 @@ export default function LandscapeDesigner() {
               >
                 <Trash2 className="h-4 w-4" /> Clear
               </Button>
+            </div>
+
+            <div className="rounded-lg border border-border bg-muted/20" style={{ aspectRatio: `${CANVAS_W} / ${CANVAS_H}` }}>
+              <canvas
+                ref={canvasRef}
+                role="img"
+                aria-label="Landscape site plan canvas"
+                className="h-full w-full touch-none rounded-lg"
+                style={{ cursor: panTool ? 'grab' : placingTransformer ? 'cell' : 'crosshair' }}
+                onClick={onClick}
+                onMouseMove={onMove}
+                onDoubleClick={finishDraft}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerUp}
+              />
             </div>
             <p className="text-xs text-muted-foreground">
               {system === 'lowvoltage' && !transformer
@@ -494,6 +556,44 @@ export default function LandscapeDesigner() {
               </div>
             </CardContent>
           </Card>
+
+          {system === 'lowvoltage' && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Cable &amp; voltage</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Cable gauge</Label>
+                  <Select value={String(gauge)} onValueChange={(v) => setGauge(Number(v) as CableGauge)}>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {CABLE_GAUGES.map((g) => (
+                        <SelectItem key={g.awg} value={String(g.awg)}>{g.awg} AWG</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {!transformer ? (
+                  <p className="text-xs text-muted-foreground">
+                    Place the transformer to measure cable length and voltage drop.
+                  </p>
+                ) : vd ? (
+                  <div className={cn('rounded-md border p-2 text-sm', vd.ok ? 'border-brand-sage/40 bg-brand-sage/10' : 'border-brand-bronze/40 bg-brand-bronze/10')}>
+                    <p className="flex items-center gap-1.5 font-medium">
+                      {vd.ok ? <Check className="h-4 w-4 text-brand-sage" /> : <AlertTriangle className="h-4 w-4 text-brand-bronze" />}
+                      Voltage drop {vd.worstDropPct}% (min {vd.minVoltage} V)
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {vd.ok
+                        ? 'Within the 10% guideline at the farthest fixture.'
+                        : 'Over 10% at the farthest fixture. Upsize the cable, move the transformer closer, or split the load across a hub.'}
+                    </p>
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader className="pb-3">

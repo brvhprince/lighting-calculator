@@ -5,10 +5,26 @@ import {
   View,
   Image,
   StyleSheet,
+  Svg,
+  Rect,
+  Circle,
+  Polyline,
+  Polygon,
   pdf,
 } from '@react-pdf/renderer';
 import { Market, formatMoneyAscii } from '@/config/markets';
+import type { Point } from '@/lib/geometry';
 import type { LandscapeResult } from '@/lib/landscape/engine';
+
+export type LandscapePlanData = {
+  widthFt: number;
+  depthFt: number;
+  shapes: { kind: 'point' | 'line' | 'area'; points: Point[] }[];
+  transformer?: Point | null;
+  anchors: Point[];
+  cable: Point[]; // ordered chain (transformer first), when present
+  vd?: { gauge: number; worstDropPct: number; minVoltage: number; ok: boolean } | null;
+};
 
 export type LandscapeReportData = {
   date: string;
@@ -16,6 +32,7 @@ export type LandscapeReportData = {
   systemLabel: string;
   result: LandscapeResult;
   logoSrc?: string;
+  plan?: LandscapePlanData;
 };
 
 const C = {
@@ -88,6 +105,37 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
+function PlanSvg({ plan }: { plan: LandscapePlanData }) {
+  const W = 380;
+  const H = 240;
+  const pad = 10;
+  const scale = Math.min((W - pad * 2) / plan.widthFt, (H - pad * 2) / plan.depthFt);
+  const ox = (W - plan.widthFt * scale) / 2;
+  const oy = (H - plan.depthFt * scale) / 2;
+  const m = (p: Point) => ({ x: ox + p.x * scale, y: oy + p.y * scale });
+  const ptsStr = (pts: Point[]) => pts.map(m).map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  const tx = plan.transformer ? m(plan.transformer) : null;
+  return (
+    <Svg width={W} height={H}>
+      <Rect x={ox} y={oy} width={plan.widthFt * scale} height={plan.depthFt * scale} fill="rgba(138,150,130,0.10)" stroke="#8A9682" strokeWidth={1} />
+      {plan.cable.length > 1 && (
+        <Polyline points={ptsStr(plan.cable)} fill="none" stroke="#A68966" strokeWidth={0.7} strokeDasharray="3 2" />
+      )}
+      {plan.shapes.map((sh, i) => {
+        if (sh.kind === 'point') {
+          const s = m(sh.points[0]);
+          return <Circle key={i} cx={s.x} cy={s.y} r={2.6} fill="#A68966" />;
+        }
+        if (sh.kind === 'area') {
+          return <Polygon key={i} points={ptsStr(sh.points)} fill="rgba(166,137,102,0.15)" stroke="#A68966" strokeWidth={1.2} />;
+        }
+        return <Polyline key={i} points={ptsStr(sh.points)} fill="none" stroke="#A68966" strokeWidth={1.5} />;
+      })}
+      {tx && <Rect x={tx.x - 3.5} y={tx.y - 3.5} width={7} height={7} fill="#2C332E" stroke="#A68966" strokeWidth={1} />}
+    </Svg>
+  );
+}
+
 function LandscapeReport(d: LandscapeReportData) {
   const { result, market } = d;
   const money = (n: number) => formatMoneyAscii(n, market);
@@ -156,6 +204,24 @@ function LandscapeReport(d: LandscapeReportData) {
             <>
               <Row label="Labour (finish)" value={money(result.install)} />
               <Row label="Installed total" value={range(result.installedLow, result.installedHigh)} />
+            </>
+          ) : null}
+
+          {/* Site plan */}
+          {d.plan ? (
+            <>
+              <Text style={s.h2}>Site plan</Text>
+              <View style={{ alignItems: 'center', borderWidth: 1, borderColor: C.border, borderRadius: 6, padding: 8, backgroundColor: C.linen }}>
+                <PlanSvg plan={d.plan} />
+              </View>
+              {d.plan.vd ? (
+                <View style={{ marginTop: 6 }}>
+                  <Row
+                    label={`Voltage drop (${d.plan.vd.gauge} AWG)`}
+                    value={`${d.plan.vd.worstDropPct}% · min ${d.plan.vd.minVoltage} V${d.plan.vd.ok ? '' : ' (over 10%)'}`}
+                  />
+                </View>
+              ) : null}
             </>
           ) : null}
 

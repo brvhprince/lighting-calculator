@@ -1,8 +1,23 @@
 import { Point, polygonArea } from '@/lib/geometry';
 import { LandscapeFeature, LandscapeTechnique } from '@/types/landscape';
 import { TECHNIQUES } from './techniques';
+import type { LandscapeResult } from './engine';
 
 const FT_TO_M = 0.3048;
+const LV_VOLTS = 12; // low-voltage system nominal voltage
+
+// A fixture position with its electrical load, for cable + voltage-drop math.
+export type Anchor = Point & { watts: number };
+
+// Copper conductor resistance, ohms per 1000 ft, by AWG gauge.
+export const CABLE_GAUGES = [
+  { awg: 14, ohmPer1000ft: 2.525 },
+  { awg: 12, ohmPer1000ft: 1.588 },
+  { awg: 10, ohmPer1000ft: 0.999 },
+  { awg: 8, ohmPer1000ft: 0.628 },
+] as const;
+
+export type CableGauge = (typeof CABLE_GAUGES)[number]['awg'];
 
 // A feature drawn on the site plan. `points` are in feet:
 //   point techniques  -> 1 point
@@ -85,13 +100,26 @@ function pointAtArcLength(points: Point[], target: number): Point {
   return points[points.length - 1];
 }
 
-// Greedy nearest-neighbour cable run from the transformer through every fixture
-// anchor, returned in metres. A practical planning estimate, not an optimal route.
-export function cableRunMeters(transformer: Point, anchors: Point[]): number {
-  if (!anchors.length) return 0;
+// All fixture anchors for a design, tagged with each fixture's wattage, by
+// matching the engine's per-feature quantities back to the drawn geometry.
+export function planAnchors(placed: PlacedFeature[], result: LandscapeResult): Anchor[] {
+  const out: Anchor[] = [];
+  for (const line of result.lines) {
+    const pf = placed.find((p) => p.id === line.featureId);
+    if (!pf) continue;
+    for (const pt of anchorsForFeature(pf, line.quantity)) {
+      out.push({ ...pt, watts: line.wattsEach });
+    }
+  }
+  return out;
+}
+
+// Greedy nearest-neighbour visiting order from the transformer through every
+// anchor. The transformer is the first node (watts 0). Practical, not optimal.
+export function cableChain(transformer: Point, anchors: Anchor[]): Anchor[] {
+  const chain: Anchor[] = [{ ...transformer, watts: 0 }];
   const remaining = anchors.slice();
-  let current = transformer;
-  let totalFt = 0;
+  let current: Point = transformer;
   while (remaining.length) {
     let bestIdx = 0;
     let bestD = Infinity;
@@ -102,10 +130,58 @@ export function cableRunMeters(transformer: Point, anchors: Point[]): number {
         bestIdx = i;
       }
     }
-    totalFt += bestD;
-    current = remaining.splice(bestIdx, 1)[0];
+    const next = remaining.splice(bestIdx, 1)[0];
+    chain.push(next);
+    current = next;
   }
-  return totalFt * FT_TO_M;
+  return chain;
+}
+
+// Total cable length of a chain, in metres.
+export function cableMetersFromChain(chain: Anchor[]): number {
+  let ft = 0;
+  for (let i = 1; i < chain.length; i++) {
+    ft += Math.hypot(chain[i].x - chain[i - 1].x, chain[i].y - chain[i - 1].y);
+  }
+  return ft * FT_TO_M;
+}
+
+// Convenience kept for callers that only need the length from raw anchors.
+export function cableRunMeters(transformer: Point, anchors: Anchor[]): number {
+  return cableMetersFromChain(cableChain(transformer, anchors));
+}
+
+export type VoltageDropResult = {
+  gauge: CableGauge;
+  minVoltage: number; // volts at the farthest fixture
+  worstDropPct: number; // (12 - minVoltage) / 12
+  ok: boolean; // within the 10% guideline
+};
+
+// Voltage drop along the daisy-chain: each segment carries the cumulative
+// downstream load, so the farthest fixture sees the largest accumulated drop.
+// Vdrop_segment = 2 × I × R, with R from the segment length and gauge.
+export function voltageDrop(chain: Anchor[], gauge: CableGauge): VoltageDropResult {
+  const r1000 = CABLE_GAUGES.find((g) => g.awg === gauge)?.ohmPer1000ft ?? 1.588;
+  let cumulativeDrop = 0;
+  let minVoltage = LV_VOLTS;
+  for (let i = 1; i < chain.length; i++) {
+    const segFt = Math.hypot(chain[i].x - chain[i - 1].x, chain[i].y - chain[i - 1].y);
+    // Current through this segment = load of every node from here to the end.
+    let downstreamWatts = 0;
+    for (let j = i; j < chain.length; j++) downstreamWatts += chain[j].watts;
+    const amps = downstreamWatts / LV_VOLTS;
+    const ohms = (segFt / 1000) * r1000;
+    cumulativeDrop += 2 * amps * ohms;
+    minVoltage = Math.min(minVoltage, LV_VOLTS - cumulativeDrop);
+  }
+  const worstDropPct = ((LV_VOLTS - minVoltage) / LV_VOLTS) * 100;
+  return {
+    gauge,
+    minVoltage: Math.round(minVoltage * 10) / 10,
+    worstDropPct: Math.round(worstDropPct * 10) / 10,
+    ok: worstDropPct <= 10,
+  };
 }
 
 export { FT_TO_M };
