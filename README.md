@@ -44,6 +44,8 @@ USD / GHS). At runtime those defaults are **overridden by values saved in the da
 | `LEAD_FROM_EMAIL` | Verified sender (defaults to `Pen Homes <hello@pen.homes>`) |
 | `LEAD_REPLY_TO` | Reply-to for customer auto-replies (defaults to `hello@pen.homes`) |
 | `LEAD_NOTIFY_EMAIL` | Internal recipient for new-lead notifications (optional) |
+| `PENOPS_SIGNAL_URL` | Pen Homes Ops `/signal` URL — each quote request becomes an SMS + email alert (optional) |
+| `PENOPS_SIGNAL_TOKEN` | This app's token in penops' `SIGNAL_TOKENS` (`lighting:<token>`) |
 | `LEAD_CONSULT_URL` | Booking link (e.g. Cal.com) — adds a "Book a consultation" email CTA when set |
 | `NEXT_PUBLIC_PENCASA_URL` | Pencasa store URL — shows a "Shop at Pencasa" CTA (app + email) when set |
 | `NEXT_PUBLIC_UMAMI_SRC` | Self-hosted Umami script URL (e.g. `https://analytics.pen.homes/script.js`) |
