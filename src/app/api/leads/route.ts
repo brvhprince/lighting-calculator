@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { verifyAdminToken, bearerFromRequest } from '@/lib/adminAuth';
 import { rateLimit, clientIp } from '@/lib/rateLimit';
 import { sendLeadEmails } from '@/lib/email';
+import { sendOpsSignal } from '@/lib/opsSignal';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -36,7 +37,7 @@ export async function POST(req: Request) {
   const spec = (body.data as Record<string, unknown>) ?? null;
 
   try {
-    await prisma.lead.create({
+    const lead = await prisma.lead.create({
       data: {
         name: name.slice(0, 200),
         email: email.slice(0, 200),
@@ -63,6 +64,18 @@ export async function POST(req: Request) {
       spec,
       pdfBase64,
       pdfFilename: pdfBase64 ? 'penlabs-lighting-report.pdf' : undefined,
+    });
+
+    await sendOpsSignal({
+      priority: 'P1',
+      title: `Lighting quote request: ${name}${body.roomName ? ` (${String(body.roomName)})` : ''}`.slice(0, 200),
+      body: [
+        `Email: ${email}${body.phone ? ` · Phone: ${String(body.phone)}` : ''}`,
+        body.message ? String(body.message).slice(0, 1000) : '',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+      dedupeKey: `lead:${lead.id}`,
     });
 
     return NextResponse.json({ ok: true });
